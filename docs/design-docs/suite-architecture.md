@@ -7,47 +7,184 @@ the same PR.
 > Status: under construction. Submodules are being added one at a time; this
 > doc grows with each addition.
 
-## Layered view
+## Top-level component diagram
 
-The suite stacks roughly like this. Top layers depend on bottom layers; bottom
-layers don't know top layers exist.
+The suite stacks in five layers. Top layers depend on bottom layers; bottom
+layers don't know top layers exist. Solid arrows are runtime data flow;
+dotted arrows are control / configuration paths.
 
+```mermaid
+flowchart TD
+    subgraph apps["Consumer applications"]
+        VP["livepeer-vtuber-project<br/>(Pipeline SaaS)"]
+    end
+
+    subgraph workload["Workload binaries — gateway + worker pairs"]
+        direction LR
+        OAI["OpenAI workload<br/><br/>livepeer-openai-gateway (payer)<br/>openai-worker-node (payee)<br/>+ engine: livepeer-openai-gateway-core"]
+        VID["Video workload<br/><br/>livepeer-video-platform<br/>(shell + worker monorepo)<br/>+ engine: livepeer-video-core"]
+        VTB["VTuber workload<br/><br/>livepeer-vtuber-gateway (payer)<br/>vtuber-worker-node (payee)"]
+    end
+
+    subgraph ops["Operator surfaces"]
+        direction LR
+        UPI["livepeer-up-installer<br/>(scaffolding CLI)"]
+        SOC["livepeer-secure-orch-console<br/>(LAN admin, signs)"]
+        OC["livepeer-orch-coordinator<br/>(public fleet UI)"]
+        GC["livepeer-gateway-console<br/>(routing dashboard)"]
+    end
+
+    subgraph control["On-chain control plane (livepeer-modules)"]
+        direction LR
+        PD["payment-daemon<br/>(sender / receiver)"]
+        SR["service-registry-daemon<br/>(publisher / resolver)"]
+        PRD["protocol-daemon<br/>(rounds + rewards)"]
+        CC["chain-commons<br/>(shared Go lib)"]
+    end
+
+    subgraph chain["Arbitrum One"]
+        direction LR
+        TB["TicketBroker"]
+        SREG["ServiceRegistry"]
+        BM["BondingManager"]
+        RM["RoundsManager"]
+    end
+
+    VP -- "OpenAI API" --> OAI
+    VP -- "vtuber sessions" --> VTB
+
+    OAI -- "tickets + discovery" --> control
+    VID -- "tickets + discovery" --> control
+    VTB -- "tickets + discovery" --> control
+
+    SOC -.-> PRD
+    SOC -.-> SR
+    OC -.-> SR
+    GC -.-> PD
+    GC -.-> SR
+    UPI -.-> ops
+
+    PD --> TB
+    SR --> SREG
+    SR --> BM
+    PRD --> BM
+    PRD --> RM
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│ Consumer applications (sit on top of the workload-binaries layer)  │
-│   livepeer-vtuber-project (AI VTuber SaaS)   ← livepeer-vtuber-project
-│     └─ consumes livepeer-openai-gateway for LLM/TTS                │
-├────────────────────────────────────────────────────────────────────┤
-│ Operator-facing surfaces                                           │
-│   livepeer-up (installer)              ← livepeer-up-installer     │
-│   secure-orch-console (LAN admin)      ← livepeer-secure-orch-console
-│   orch-coordinator (public fleet UI)   ← livepeer-orch-coordinator │
-│   gateway-console (routing dashboard)  ← livepeer-gateway-console  │
-├────────────────────────────────────────────────────────────────────┤
-│ Workload binaries                                                  │
-│   OpenAI workload (three repos, separate worker)                   │
-│     openai-worker-node (payee, on worker-orch) ← openai-worker-node│
-│     livepeer-openai-gateway (payer, on gateway)← livepeer-openai-gateway
-│       └─ consumes engine via npm:           ← livepeer-openai-gateway-core
-│   Video workload (one monorepo, bundled worker)                    │
-│     livepeer-video-platform (shell+worker)  ← livepeer-video-platform
-│       ├─ apps/api/ — shell (TS)                                    │
-│       ├─ apps/transcode-worker-node/ — worker (Go)                 │
-│       └─ consumes engine via npm:           ← livepeer-video-core  │
-│   VTuber workload (capability: livepeer:vtuber-session)            │
-│     livepeer-vtuber-gateway (payer)         ← livepeer-vtuber-gateway
-│     vtuber-worker-node (payee)              ← vtuber-worker-node   │
-│       └─ proxies to session-runner inside livepeer-vtuber-project  │
-│   transcode-only · custom                       (NOT YET ADDED)    │
-├────────────────────────────────────────────────────────────────────┤
-│ On-chain control plane                              ← livepeer-modules
-│   chain-commons (lib)                                              │
-│   payment-daemon · service-registry-daemon · protocol-daemon       │
-├────────────────────────────────────────────────────────────────────┤
-│ Chain (Arbitrum One)                                               │
-│   BondingManager · RoundsManager · TicketBroker · ServiceRegistry  │
-└────────────────────────────────────────────────────────────────────┘
+
+The five layers, top to bottom:
+
+- **Consumer applications** — Cloud-SPE products that *use* the platform via
+  customer-facing APIs. One submodule today (`livepeer-vtuber-project`).
+- **Workload binaries** — gateway + worker pairs (and optional engines)
+  per workload type. OpenAI, video, vtuber today; transcode-only / custom
+  expected later.
+- **Operator surfaces** — the four operator-facing tools (installer,
+  three consoles). They mount daemon sockets but never participate in
+  customer traffic.
+- **On-chain control plane** (`livepeer-modules`) — chain-commons lib +
+  three daemons. Talks to chain via RPC; talks to the layer above via
+  unix-socket gRPC.
+- **Arbitrum One** — the four contracts the suite cares about.
+
+Sub-diagrams later in this file zoom into specific flows.
+
+## Trust zones and network topology
+
+A different lens: **what physically runs where, and what crosses each
+host boundary**. Two operator entities (orchestrator + gateway) own four
+host archetypes between them.
+
+```mermaid
+flowchart LR
+    subgraph internet["public internet"]
+        CUST["customer<br/>(or Pipeline SaaS)"]
+    end
+
+    subgraph secure_host["secure-orch host (orch operator) — FIREWALLED"]
+        direction TB
+        SO_CON["livepeer-secure-orch-console<br/>(LAN-only, 127.0.0.1)"]
+        PRD["protocol-daemon<br/>(always-on)"]
+        SO_SR["service-registry-daemon<br/>publisher (rooted manifest)"]
+        COLD[("cold orch keystore<br/>NEVER LEAVES")]
+    end
+
+    subgraph coord_host["orch-coordinator host (orch operator) — public"]
+        OC["livepeer-orch-coordinator<br/>(no keys, no daemon sockets)"]
+    end
+
+    subgraph worker_host["worker-orch host × N (orch operator) — public"]
+        direction TB
+        WN["openai-worker-node<br/>or vtuber-worker-node<br/>or video worker"]
+        W_PD["payment-daemon<br/>receiver mode"]
+        W_SR["service-registry-daemon<br/>publisher (leaf manifest)"]
+        W_DUMMY[("shared dummy keystore")]
+        W_BACKEND["inference backend<br/>(vLLM / whisper / FFmpeg / runner)"]
+    end
+
+    subgraph gw_host["gateway host (gateway operator) — public"]
+        direction TB
+        GW_APP["livepeer-openai-gateway<br/>or livepeer-vtuber-gateway<br/>or video shell"]
+        GW_PD["payment-daemon<br/>sender mode"]
+        GW_SR["service-registry-daemon<br/>resolver mode"]
+        GW_CON["livepeer-gateway-console"]
+        GW_HOTKEY[("gateway hot wallet")]
+    end
+
+    subgraph chain["Arbitrum One"]
+        CHAIN_C["TicketBroker · ServiceRegistry<br/>· BondingManager · RoundsManager"]
+    end
+
+    CUST -- "HTTPS<br/>Authorization: Bearer api-key" --> GW_APP
+    GW_APP -- "HTTPS + ticket header" --> WN
+    GW_APP <-- "unix socket" --> GW_PD
+    GW_APP <-- "unix socket" --> GW_SR
+    GW_CON <-- "unix sockets" --> GW_PD
+    GW_CON <-- "unix sockets" --> GW_SR
+
+    WN <-- "unix socket" --> W_PD
+    WN <-- "unix socket" --> W_SR
+    WN -- "HTTP (localhost)" --> W_BACKEND
+
+    SO_CON <-- "unix sockets" --> PRD
+    SO_CON <-- "unix sockets" --> SO_SR
+
+    GW_SR -- "HTTPS<br/>manifest fetch + verify" --> OC
+    SO_SR -. "manifest upload<br/>(manual today)" .-> OC
+
+    PRD --> CHAIN_C
+    GW_PD --> CHAIN_C
+    W_PD --> CHAIN_C
+    GW_SR --> CHAIN_C
+    SO_SR --> CHAIN_C
+    OC --> CHAIN_C
+
+    COLD --- PRD
+    COLD --- SO_SR
+    W_DUMMY --- W_PD
+    GW_HOTKEY --- GW_PD
 ```
+
+**Key invariants this view enforces:**
+
+- **Cold orch keystore lives only on the firewalled `secure-orch` host.**
+  It signs round txs (via `protocol-daemon`) and the rooted manifest (via
+  `secure-orch-console` → publisher daemon).
+- **Workers run a publisher daemon** that signs only their own leaf
+  manifest fragment — *not* the rooted manifest. (Open architectural
+  question — see end of this doc.)
+- **Gateway hot wallet is on the gateway host**, owned by a different
+  entity than the orchestrator. Used by the sender daemon to sign
+  probabilistic tickets.
+- **All daemon access is unix-socket only.** No cross-host gRPC. Anything
+  crossing a host boundary is HTTPS, and all of it ends up at the chain
+  (RPC) or at a customer-facing endpoint (`Authorization: Bearer`).
+- **`livepeer-orch-coordinator` is the only public host that holds no
+  keys and mounts no daemon sockets.** Verifies signatures on read; that's
+  it.
+
+The `livepeer-up-installer` doesn't appear above — it runs **once** on
+each host to materialize `compose.yaml` + `.env` + placeholder keystore,
+then exits. Not part of the runtime topology.
 
 ## What each submodule contributes
 
@@ -247,47 +384,113 @@ trust gradient:
 
 ## End-to-end manifest publishing flow
 
-With the three relevant submodules in (`livepeer-modules`,
-`livepeer-secure-orch-console`, `livepeer-orch-coordinator`), the registry
-manifest pipeline is fully expressible:
+The registry manifest pipeline spans three submodules
+(`livepeer-secure-orch-console`, `livepeer-orch-coordinator`, and the
+gateway-side resolver in `livepeer-modules`).
 
+```mermaid
+sequenceDiagram
+    actor Op as Operator
+    participant SOC as livepeer-secure-orch-console<br/>(secure-orch)
+    participant PSR as service-registry-daemon<br/>publisher (secure-orch)
+    participant Cold as cold orch<br/>keystore
+    participant OC as livepeer-orch-coordinator<br/>(public host)
+    participant Chain as ServiceRegistry<br/>(Arbitrum One)
+    participant GSR as service-registry-daemon<br/>resolver (gateway)
+
+    Note over Op,Cold: 1. Sign — inside the firewall
+    Op->>SOC: upload workers.yaml
+    SOC->>PSR: Publisher.BuildAndSign
+    PSR->>Cold: sign with cold key
+    Cold-->>PSR: signature
+    PSR-->>SOC: signed registry-manifest.json
+
+    Note over Op,OC: 2. Transport (manual today — scp / upload form)
+    Op->>OC: POST signed manifest (auth'd /api)
+    OC->>Chain: read on-chain orch identity (viem)
+    Chain-->>OC: orch address
+    OC->>OC: verify signature against orch identity
+    OC->>OC: serve at /manifest.json (public)
+
+    Note over Chain: ServiceRegistry.serviceURI<br/>set once at orch creation,<br/>points at OC's public URL
+
+    Note over GSR,OC: 3. Gateway resolver fetches + re-verifies (per-round)
+    GSR->>Chain: GetServiceURI(orch_addr)
+    Chain-->>GSR: orch's manifest URL
+    GSR->>OC: GET /manifest.json
+    OC-->>GSR: signed manifest
+    GSR->>GSR: verify signature again<br/>(defense in depth)
+    GSR->>GSR: cache for Select queries
 ```
-[1] secure-orch host (firewalled)
-       livepeer-secure-orch-console
-         └─→ uploads workers.yaml
-         └─→ calls Publisher.BuildAndSign over publisher socket
-              └─→ service-registry-daemon (publisher mode)
-                   └─→ signs registry-manifest.json with cold orch keystore
-       └─→ operator transports signed manifest out of firewall
-            (manual: scp / object store / upload form — manual step today)
 
-[2] orch-coordinator host (public)
-       livepeer-orch-coordinator
-         └─→ accepts signed manifest via auth'd /api endpoint
-         └─→ verifies signature against on-chain orch identity (viem read)
-         └─→ serves it publicly at /manifest.json
+**Two verifications, intentionally.** The coordinator verifies on
+upload; every gateway resolver verifies again on fetch. If the
+coordinator host is ever compromised, tampered manifests still don't
+propagate.
 
-[3] On-chain
-       ServiceRegistry.serviceURI (set once at orch creation, rarely changed)
-         └─→ points to the orch-coordinator's public /manifest.json URL
-
-[4] gateway host (separate operator entity, not yet in suite)
-       service-registry-daemon (resolver mode)
-         └─→ walks BondingManager pool linked list once per round
-         └─→ for each orch: calls ServiceRegistry.GetServiceURI
-         └─→ fetches /manifest.json, re-verifies signature
-         └─→ caches; serves Select(capability=…) queries to the gateway
-```
-
-Two signature verifications happen on the same manifest: once when the
-coordinator accepts the upload, again when each gateway resolver fetches
-it. This is intentional defense in depth — if the coordinator host is
-compromised, gateways still won't accept tampered manifests.
-
-The transport step from secure-orch → orch-coordinator is **manual today**.
-HTTP-probe-from-URL discovery and a managed transport are deferred — see
+**The transport step is manual today.** HTTP-probe-from-URL discovery
+and a managed transport are deferred — see
 `livepeer-modules/service-registry-daemon/docs/exec-plans/tech-debt-tracker.md`
 under `publisher-http-probe-impl`.
+
+## Orchestrator-side coordination
+
+The orch-side hosts (`secure-orch`, `worker-orch × N`, `orch-coordinator`)
+are linked by two cadences: a **per-round** loop driven by the chain
+(initialize round + reward + resolver refresh) and an **on-demand**
+loop driven by the operator (manifest update when the worker fleet
+changes).
+
+```mermaid
+sequenceDiagram
+    participant RM as RoundsManager<br/>(chain)
+    participant BM as BondingManager<br/>(chain)
+    participant PRD as protocol-daemon<br/>(secure-orch)
+    actor Op as Orch operator
+    participant SOC as livepeer-secure-orch-console
+    participant PSR as service-registry-daemon<br/>publisher (secure-orch)
+    participant WSR as service-registry-daemon<br/>publisher (worker-orch × N)
+    participant OC as livepeer-orch-coordinator
+    participant GSR as service-registry-daemon<br/>resolver (gateway)
+
+    Note over RM,GSR: Per-round cadence (~19h on Arbitrum One)
+    PRD->>RM: initializeRound (idempotent)
+    RM-->>PRD: ok
+    PRD->>BM: rewardWithHint(orch)
+    BM-->>PRD: reward credited
+
+    GSR->>BM: GetFirstTranscoderInPool / GetNextTranscoderInPool
+    BM-->>GSR: orch addresses
+    loop for each orch in the pool
+        GSR->>OC: GET /manifest.json
+        OC-->>GSR: signed manifest
+        GSR->>GSR: verify + cache
+    end
+
+    Note over Op,OC: On-demand cadence (worker-fleet change)
+    Op->>WSR: each worker host signs its own leaf<br/>capability fragment
+    Op->>SOC: edit workers.yaml + upload
+    SOC->>PSR: Publisher.BuildAndSign rooted manifest
+    PSR-->>SOC: signed manifest
+    Op->>OC: ship signed manifest (manual transport)
+    OC->>OC: verify + host
+
+    Note over PRD,GSR: protocol-daemon never participates in manifest flow.<br/>Resolver fetches happen on round events from chain-commons.roundclock.
+```
+
+**Two daemons, two responsibilities, one host (`secure-orch`):**
+
+- **`protocol-daemon`** owns the chain state machine (`initializeRound` +
+  `rewardWithHint`). Always-on. Doesn't touch the manifest.
+- **`service-registry-daemon`** in publisher mode signs the rooted
+  manifest, only when the operator triggers it via
+  `secure-orch-console` → `Publisher.BuildAndSign`. On-demand.
+
+**Resolver refresh isn't a cron** — `service-registry-daemon` resolver
+listens to `chain-commons.roundclock` and refreshes when a new round
+starts. Mid-round, queries hit the cache. Operator can hand-trigger
+`Resolver.Refresh()` for ad-hoc invalidation (this is what
+`livepeer-gateway-console`'s manual refresh button does).
 
 ### `livepeer-gateway-console` — payer-side routing dashboard
 
@@ -353,69 +556,75 @@ posture:
 | BYO reverse proxy | ✓ | ✓ | ✓ |
 | Bearer-token auth | ✓ | ✓ | ✓ |
 
-## End-to-end gateway request flow
+## OpenAI workload — end-to-end request flow
 
-With `livepeer-modules`, `livepeer-gateway-console`, and
-`livepeer-openai-gateway` in the suite, the **payer side** is fully
-expressible. Walking a customer's chat completion request from gateway
-ingress to settlement on a worker-orch:
+A customer's chat completion request, gateway ingress to settlement
+on a worker-orch. Includes the USD ↔ ETH translation and the Stripe
+top-up loop.
 
-```
-customer ──HTTPS──▶ livepeer-openai-gateway (Fastify, on the gateway host)
-  │
-  │ Authorization: Bearer <api-key>  →  auth + tier check
-  │ Postgres ledger: customer balance / free-tier quota check (atomic)
-  │
-  ├─ pick a worker-node from the gateway's pool
-  │  (config-driven NodeBook + Resolver.Select for capability filtering)
-  │
-  ↓ unix socket
-service-registry-daemon (resolver mode)
-  │ pool walk on round event → cached orch roster
-  │ /manifest.json fetch + sig verify per orch
-  │
-  └─ returns: pick = (orch_address, transcoder_uri, capability_endpoint)
+```mermaid
+sequenceDiagram
+    actor Cust as Customer
+    participant Stripe
+    participant GW as livepeer-openai-gateway<br/>(Fastify shell)
+    participant DB as Postgres ledger
+    participant Eng as livepeer-openai-gateway-core<br/>(npm engine)
+    participant Resolver as service-registry-daemon<br/>resolver
+    participant Sender as payment-daemon<br/>sender
+    participant Worker as openai-worker-node
+    participant Receiver as payment-daemon<br/>receiver
+    participant TB as TicketBroker<br/>(chain)
+    participant Backend as inference backend<br/>(vLLM / whisper / etc.)
 
-gateway then calls the workload directly:
-  │
-  │   HTTPS request → openai-worker-node on worker-orch host
-  │   (or another workload type — transcode/video are not in suite yet)
-  │
-  ├─ payment leg, in parallel:
-  │     payment-daemon (sender mode) on the gateway
-  │       │ unix socket: CreatePayment(faceValue, recipient=orch_address)
-  │       └─ signs probabilistic ticket, hands it back
-  │     livepeer-openai-gateway attaches the signed ticket to the
-  │     outbound HTTPS request
+    Note over Cust,Stripe: Top-up (one-time, async)
+    Cust->>GW: POST /v1/billing/topup
+    GW->>Stripe: Checkout Session
+    Stripe-->>Cust: Checkout URL
+    Cust->>Stripe: pay
+    Stripe->>GW: webhook checkout.session.completed
+    GW->>DB: credit customer balance (USD)
 
-worker-orch receives request + ticket:
-  │
-  │ openai-worker-node hands the ticket to:
-  ↓ unix socket
-payment-daemon (receiver mode) on worker-orch
-  │ if ticket is "winning" → redeem via TicketBroker
-  │   faceValue lands in the cold orch's reserve (--orch-address override)
-  │
-  │ on success: openai-worker-node forwards request to local backend
-  ↓ HTTP
-inference backend (vLLM / diffusers / whisper / TTS) on worker-orch
+    Note over Cust,Backend: Per-request flow
+    Cust->>GW: POST /v1/chat/completions<br/>Authorization: Bearer api-key
+    GW->>DB: SELECT … FOR UPDATE balance
+    DB-->>GW: balance OK
+    GW->>Eng: dispatch
+    Eng->>Resolver: Resolver.Select(capability)
+    Resolver-->>Eng: pick (orch_addr, worker_uri)
+    Eng->>Sender: CreatePayment(faceValue, recipient=orch_addr)
+    Sender-->>Eng: signed ticket
 
-response path:
-  │ openai-worker-node returns the inference response + reported usage
-  │ livepeer-openai-gateway commits billing from node-reported usage
-  │   (USD debit on Postgres ledger, atomic SELECT … FOR UPDATE)
-  │ tiktoken local count is observation-only — drift metered, not enforced
-  ↓
-customer receives standard OpenAI-shaped response (USD debited, never wei)
+    Eng->>Worker: HTTPS + X-Livepeer-Payment ticket
+    Worker->>Receiver: validate ticket
+    alt ticket is winning
+        Receiver->>TB: redeemWinningTicket
+        TB-->>Receiver: faceValue → cold orch reserve
+    end
+    Receiver-->>Worker: ok
+    Worker->>Backend: HTTP request (localhost)
+    Backend-->>Worker: inference response + usage
+    Worker-->>Eng: response + reported usage
+    Eng-->>GW: response
 
-throughout, gateway-console reads:
-  - resolver socket   → routing dashboard, audit log, manual Refresh
-  - sender socket     → wallet status, deposit info
-  - chain via viem    → wallet balance
+    GW->>DB: debit USD-cents (atomic, FOR UPDATE)
+    GW-->>Cust: OpenAI-shaped response (USD debited, never wei)
 ```
 
-The gateway is **fail-closed on payment-daemon outage** (502/503 to the
-customer) — by core belief, billing never proceeds without payment.
+**Key invariants (from `livepeer-openai-gateway`'s core beliefs):**
+
+- **Customer never sees wei.** USD-cents on the customer surface; ETH
+  micropayments only on the network side.
+- **Atomic ledger debits.** `SELECT … FOR UPDATE` for both reserve and
+  commit. No read-modify-write.
+- **Fail-closed on payment-daemon outage** → 502/503. Billing never
+  proceeds without payment.
+- **Token audit is observation-only.** `tiktoken` local counts cross-
+  checked against node-reported counts; drift is metered, not enforced.
+
+`livepeer-gateway-console` reads the resolver socket (routing
+dashboard + audit log + manual Refresh), the sender socket (wallet +
+deposit info), and the chain via viem (wallet balance) — but doesn't
+participate in any per-request path.
 
 ## Workload binaries — the engine + shell pattern
 
@@ -779,19 +988,67 @@ in **sender** mode for ticket creation, same as `livepeer-openai-gateway`.
 
 The worker (`livepeer-video-worker-node`) co-locates with a `payment-daemon`
 in **receiver** mode for ticket validation. Same as `openai-worker-node`.
+It also co-locates a `service-registry-daemon` in **publisher** mode —
+confirmed as a real pattern (not a typo) once `vtuber-worker-node` showed
+the same shape. See the open-architectural-question at the bottom of
+this file.
 
-But the README also says workers run a co-located **`service-registry-daemon`
-in publisher mode** — and that's a topology divergence from `livepeer-modules`'s
-host-archetype model, which puts the publisher only on `secure-orch`
-behind the firewall. Either:
+#### End-to-end video flow (VOD upload)
 
-- The video worker actually runs a publisher-mode daemon on the same host
-  (which would mean each worker host signs its own manifest fragment) — a
-  deviation from the cold-key custodian model.
-- The README has a typo and meant "resolver" or omitted "(optional)".
+The video-side request flow differs from the OpenAI side in three
+material ways: there's a **two-step submit** (upload then transcode),
+**persistent storage** is in the loop, and **webhooks** carry async
+completion events.
 
-Worth verifying. Tracked in the open-questions list at the bottom of this
-file.
+```mermaid
+sequenceDiagram
+    actor Cust as Customer
+    participant GW as video-platform shell<br/>(apps/api)
+    participant DB as Postgres ledger
+    participant Eng as livepeer-video-core<br/>(npm engine)
+    participant Storage as StorageProvider<br/>(S3 / R2 / MinIO)
+    participant Resolver as service-registry-daemon<br/>resolver
+    participant Sender as payment-daemon<br/>sender
+    participant Worker as video-worker-node<br/>(in same monorepo)
+    participant Webhook as customer<br/>webhook endpoint
+
+    Note over Cust,Storage: Step 1 — create upload, push bytes
+    Cust->>GW: POST /v1/uploads<br/>Authorization: Bearer key
+    GW->>Eng: dispatchUploadCreate
+    Eng->>Storage: signed upload URL
+    Storage-->>Eng: URL
+    Eng-->>GW: URL
+    GW-->>Cust: { upload_url, asset_id }
+    Cust->>Storage: PUT video bytes
+    Storage->>Storage: complete
+
+    Note over Cust,Worker: Step 2 — submit for transcode
+    Cust->>GW: POST /v1/vod/submit { asset_id, encoding_tier }
+    GW->>DB: reserve cost quote<br/>(time × codec × rendition × tier)
+    GW->>Eng: dispatchVodSubmit
+    Eng->>Resolver: Select(capability=video-transcode)
+    Resolver-->>Eng: worker URL
+    Eng->>Sender: CreatePayment ticket
+    Sender-->>Eng: ticket
+    Eng->>Worker: HTTPS + ticket (transcode job)
+    Worker->>Worker: validate ticket via local payment-daemon
+    Worker->>Storage: read source bytes
+    Worker->>Worker: FFmpeg transcode → renditions
+    Worker->>Storage: write outputs (HLS playlist + segments)
+    Worker-->>Eng: job complete + usage report
+
+    Eng->>DB: commit charge (USD-cents)
+    Eng->>Webhook: signed asset.ready event
+    Webhook-->>Eng: 200 OK
+
+    Cust->>GW: GET /v1/vod/status/{asset_id}
+    GW-->>Cust: { status: ready, playback_url }
+```
+
+The Live HLS flow is similar but persistent: a single
+`dispatchLiveStreamCreate` opens a session, RTMP ingest streams to the
+worker, and `session.usage.tick` events drive ongoing billing the same
+way `vtuber-session` does (see VTuber flow below).
 
 #### Future cross-engine consumption (planned)
 
@@ -973,23 +1230,56 @@ API key is only used to open sessions; the per-session token is what
 flows over the long-running WebSocket. Limits blast radius if the WS
 endpoint leaks a token.
 
-#### Position in the stack
+#### End-to-end VTuber session flow
 
-```
-Pipeline (livepeer-vtuber-project's pipeline-app)
-   │
-   │ POST /v1/vtuber/sessions
-   │ Authorization: Bearer <customer key>
-   ↓
-livepeer-vtuber-gateway (this repo)
-   ├─ unix-socket gRPC → payment-daemon (sender, sidecar)
-   ├─ unix-socket gRPC → service-registry-daemon (resolver, sidecar)
-   └─ HTTPS → vtuber-worker-node (NOT YET CREATED)
-        │ X-Livepeer-Payment header (probabilistic ticket)
-        │ Authorization: Bearer <session_child_bearer>
-        │ Body: session params per session-runner.md
-        ↓
-        worker → session.usage.tick (over WS) → gateway debits ledger
+The vtuber pipeline differs from the OpenAI side in three material ways:
+**long-lived sessions** with a 2-step open (HTTP open + WebSocket
+attach), **session-scoped child bearers** (`vtbs_*`) instead of the
+customer's long-lived API key on the WS, and **per-tick billing** over
+WebSocket instead of per-request.
+
+```mermaid
+sequenceDiagram
+    participant Pipeline as livepeer-vtuber-project<br/>(Pipeline SaaS)
+    participant VTBG as livepeer-vtuber-gateway<br/>(shell, M9)
+    participant DB as Postgres ledger
+    participant Resolver as service-registry-daemon<br/>resolver
+    participant Sender as payment-daemon<br/>sender
+    participant VTBW as vtuber-worker-node<br/>(M1 — skeleton today)
+    participant Runner as session-runner<br/>(in livepeer-vtuber-project)
+    participant OAIG as livepeer-openai-gateway
+
+    Note over Pipeline,Runner: Step 1 — open session (HTTP)
+    Pipeline->>VTBG: POST /v1/vtuber/sessions<br/>Authorization: Bearer customer-key
+    VTBG->>DB: check balance
+    VTBG->>Resolver: Select(capability=livepeer:vtuber-session)
+    Resolver-->>VTBG: vtuber-worker URL
+    VTBG->>VTBW: GET /quote
+    VTBW-->>VTBG: TicketParams
+    VTBG->>Sender: PayerDaemon.StartSession + CreatePayment
+    Sender-->>VTBG: ticket
+    VTBG->>VTBG: mint vtbs_* (HMAC + pepper, hash-stored)
+    VTBG->>VTBW: POST /api/sessions/start<br/>X-Livepeer-Payment ticket<br/>Authorization: Bearer vtbs_*
+    VTBW->>VTBW: validate ticket
+    VTBW->>Runner: forward session-start
+    Runner-->>VTBW: session active
+    VTBW-->>VTBG: 2xx
+    VTBG->>DB: mark session active
+    VTBG-->>Pipeline: { session_id, session_child_bearer }
+
+    Note over Pipeline,Runner: Step 2 — WebSocket relay (long-lived)
+    Pipeline->>VTBG: WS /v1/vtuber/sessions/{id}/control<br/>Bearer vtbs_*
+    VTBW->>VTBG: WS /v1/vtuber/sessions/{id}/worker-control<br/>Bearer vtbsw_* (deterministic HMAC)
+    Note over VTBG: gateway relays frames<br/>between control + worker-control
+
+    loop usage tick (continuous)
+        VTBW-->>VTBG: session.usage.tick
+        VTBG->>DB: vtuberBilling.recordUsageTick<br/>(debit USD-cents)
+    end
+
+    Note over Pipeline,OAIG: In parallel — Pipeline calls livepeer-openai-gateway<br/>for nested LLM/TTS during the session
+    Pipeline->>OAIG: POST /v1/chat/completions
+    OAIG-->>Pipeline: response
 ```
 
 The vtuber project (consumer-applications layer) talks to **two**
