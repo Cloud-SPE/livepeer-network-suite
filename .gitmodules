@@ -1,0 +1,39 @@
+[submodule "livepeer-modules"]
+	path = livepeer-modules
+	url = https://github.com/Cloud-SPE/livepeer-modules.git
+[submodule "livepeer-up-installer"]
+	path = livepeer-up-installer
+	url = https://github.com/Cloud-SPE/livepeer-up-installer.git
+[submodule "livepeer-secure-orch-console"]
+	path = livepeer-secure-orch-console
+	url = https://github.com/Cloud-SPE/livepeer-secure-orch-console.git
+[submodule "livepeer-orch-coordinator"]
+	path = livepeer-orch-coordinator
+	url = https://github.com/Cloud-SPE/livepeer-orch-coordinator.git
+[submodule "livepeer-gateway-console"]
+	path = livepeer-gateway-console
+	url = https://github.com/Cloud-SPE/livepeer-gateway-console.git
+[submodule "openai-worker-node"]
+	path = openai-worker-node
+	url = https://github.com/Cloud-SPE/openai-worker-node.git
+[submodule "livepeer-openai-gateway"]
+	path = livepeer-openai-gateway
+	url = https://github.com/Cloud-SPE/livepeer-openai-gateway.git
+[submodule "livepeer-openai-gateway-core"]
+	path = livepeer-openai-gateway-core
+	url = https://github.com/Cloud-SPE/livepeer-openai-gateway-core.git
+[submodule "livepeer-video-core"]
+	path = livepeer-video-core
+	url = https://github.com/Cloud-SPE/livepeer-video-core.git
+[submodule "livepeer-video-platform"]
+	path = livepeer-video-platform
+	url = https://github.com/Cloud-SPE/livepeer-video-platform.git
+[submodule "livepeer-vtuber-project"]
+	path = livepeer-vtuber-project
+	url = https://github.com/Cloud-SPE/livepeer-vtuber-project.git
+[submodule "livepeer-vtuber-gateway"]
+	path = livepeer-vtuber-gateway
+	url = https://github.com/Cloud-SPE/livepeer-vtuber-gateway.git
+[submodule "vtuber-worker-node"]
+	path = vtuber-worker-node
+	url = https://github.com/Cloud-SPE/vtuber-worker-node.git

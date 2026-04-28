@@ -1,0 +1,18 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# docs/generated/ is INTENTIONALLY tracked — that's the agent-readable system of record
+# for machine-produced reference. If something should NOT be checked in, put it in /tmp.
