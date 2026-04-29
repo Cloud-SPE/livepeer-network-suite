@@ -7,6 +7,39 @@ the same PR.
 > Status: under construction. Submodules are being added one at a time; this
 > doc grows with each addition.
 
+## v3.0.0 — archetype A is the canonical deployment
+
+Effective with the suite-wide v3.0.0 cut (see
+[`docs/exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)),
+**archetype A is the only supported deployment**:
+
+- **Workers** (openai-worker-node, vtuber-worker-node, video-worker-node)
+  are **registry-invisible**. They do not dial publisher daemons. They
+  expose a uniform `/registry/offerings` HTTP endpoint the
+  orch-coordinator scrapes (per
+  [`worker-offerings-endpoint.md`](https://github.com/Cloud-SPE/livepeer-modules/blob/main/service-registry-daemon/docs/design-docs/worker-offerings-endpoint.md)).
+- **Operator** uses the orch-coordinator's SPA to maintain a roster
+  (with optional scrape-and-confirm against `/registry/offerings`),
+  composes a `workers.yaml` proposal, hand-carries it to the secure-orch
+  host, signs via `Publisher.BuildAndSign`, hand-carries the signed
+  manifest back, and the coordinator atomic-swaps it to the public
+  `/.well-known/livepeer-registry.json`.
+- **Gateways** discover orchs via `service-registry-daemon` (resolver
+  mode) sidecars calling `Resolver.Select(capability, offering, tier,
+  ...)`. Pricing flows from the manifest's `offerings[].price_per_work_unit_wei`.
+
+The pre-v3.0.0 worker-publisher pattern (workers self-publishing their
+manifests directly) is no longer supported. This resolves the
+"publisher-on-worker semantics" question raised as Item 10 in
+[`docs/exec-plans/active/0002-suite-wide-alignment.md`](../exec-plans/active/0002-suite-wide-alignment.md).
+
+The v3.0.0 cut also renamed `Capability.Model` → `Capability.Offering`
+and `models[]` → `offerings[]` across the wire (manifest schema, proto,
+all consumer code) — see plan 0003 §Decision 4. Operators now think in
+terms of "offerings" (priced tiers under a capability), which reads
+naturally for AI workloads (gpt-oss-20b), video presets (h264-1080p),
+and streaming session tiers (vtuber-1080p30).
+
 ## Top-level component diagram
 
 The suite stacks in five layers. Top layers depend on bottom layers; bottom

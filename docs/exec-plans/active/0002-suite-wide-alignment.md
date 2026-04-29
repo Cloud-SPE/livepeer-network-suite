@@ -201,7 +201,19 @@ canonical design to a `livepeer-openai-project` repo (or fold into
 `livepeer-modules-conventions` from Item 2), and have `livepeer-openai-gateway`
 + `openai-worker-node` link to it.
 
-## Item 10 — document publisher-on-worker semantics
+## ~~Item 10 — document publisher-on-worker semantics~~ (RESOLVED 2026-04-29)
+
+**Resolved by [plan 0003](./0003-archetype-a-deploy-unblock.md):**
+worker self-publishing is dead. Workers (openai-worker-node,
+vtuber-worker-node, video-worker-node) are registry-invisible under
+archetype A; the orch-coordinator scrapes `/registry/offerings` and
+the secure-orch console signs the manifest. The pre-v3.0.0
+capabilityreporter / publisherdaemon paths have been deleted from the
+worker repos.
+
+Original (now-superseded) text follows for history:
+
+## Item 10 (HISTORICAL) — document publisher-on-worker semantics
 
 Two workload workers (`livepeer-video-platform/apps/transcode-worker-node/`
 and `vtuber-worker-node`) co-locate `service-registry-daemon` in
