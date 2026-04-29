@@ -25,9 +25,6 @@
 [submodule "livepeer-video-core"]
 	path = livepeer-video-core
 	url = https://github.com/Cloud-SPE/livepeer-video-core.git
-[submodule "livepeer-video-platform"]
-	path = livepeer-video-platform
-	url = https://github.com/Cloud-SPE/livepeer-video-platform.git
 [submodule "livepeer-vtuber-project"]
 	path = livepeer-vtuber-project
 	url = https://github.com/Cloud-SPE/livepeer-vtuber-project.git
@@ -40,3 +37,6 @@
 [submodule "video-worker-node"]
 	path = video-worker-node
 	url = git@github.com:Cloud-SPE/video-worker-node.git
+[submodule "livepeer-video-gateway"]
+	path = livepeer-video-gateway
+	url = git@github.com:Cloud-SPE/livepeer-video-gateway.git
