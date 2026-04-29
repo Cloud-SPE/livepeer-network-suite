@@ -37,3 +37,6 @@
 [submodule "vtuber-worker-node"]
 	path = vtuber-worker-node
 	url = https://github.com/Cloud-SPE/vtuber-worker-node.git
+[submodule "video-worker-node"]
+	path = video-worker-node
+	url = git@github.com:Cloud-SPE/video-worker-node.git
