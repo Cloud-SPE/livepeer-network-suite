@@ -92,15 +92,21 @@ Sub-diagrams later in this file zoom into specific flows.
 
 A different lens: **what physically runs where, and what crosses each
 host boundary**. Two operator entities (orchestrator + gateway) own four
-host archetypes between them.
+host archetypes between them. The orch operator runs three host
+archetypes; the gateway operator runs one.
+
+Two diagrams below — orchestrator side and gateway/customer side. The
+chain (`Arbitrum One`) is shared; everything else stays in its operator
+domain.
+
+### Orchestrator side
+
+The three hosts the orch operator runs. The cold key never crosses a
+host boundary; manifests do.
 
 ```mermaid
 flowchart LR
-    subgraph internet["public internet"]
-        CUST["customer<br/>(or Pipeline SaaS)"]
-    end
-
-    subgraph secure_host["secure-orch host (orch operator) — FIREWALLED"]
+    subgraph secure_host["secure-orch host — FIREWALLED"]
         direction TB
         SO_CON["livepeer-secure-orch-console<br/>(LAN-only, 127.0.0.1)"]
         PRD["protocol-daemon<br/>(always-on)"]
@@ -108,17 +114,63 @@ flowchart LR
         COLD[("cold orch keystore<br/>NEVER LEAVES")]
     end
 
-    subgraph coord_host["orch-coordinator host (orch operator) — public"]
+    subgraph coord_host["orch-coordinator host — public"]
         OC["livepeer-orch-coordinator<br/>(no keys, no daemon sockets)"]
     end
 
-    subgraph worker_host["worker-orch host × N (orch operator) — public"]
+    subgraph worker_host["worker-orch host × N — public"]
         direction TB
         WN["openai-worker-node<br/>or vtuber-worker-node<br/>or video worker"]
         W_PD["payment-daemon<br/>receiver mode"]
         W_SR["service-registry-daemon<br/>publisher (leaf manifest)"]
         W_DUMMY[("shared dummy keystore")]
         W_BACKEND["inference backend<br/>(vLLM / whisper / FFmpeg / runner)"]
+    end
+
+    subgraph chain["Arbitrum One"]
+        CHAIN_C["TicketBroker · ServiceRegistry<br/>· BondingManager · RoundsManager"]
+    end
+
+    SO_CON <-- "unix sockets" --> PRD
+    SO_CON <-- "unix sockets" --> SO_SR
+    COLD --- PRD
+    COLD --- SO_SR
+
+    SO_SR -. "manifest upload<br/>(manual today)" .-> OC
+
+    WN <-- "unix socket" --> W_PD
+    WN <-- "unix socket" --> W_SR
+    WN -- "HTTP (localhost)" --> W_BACKEND
+    W_DUMMY --- W_PD
+
+    PRD --> CHAIN_C
+    W_PD --> CHAIN_C
+    SO_SR --> CHAIN_C
+    OC --> CHAIN_C
+```
+
+**Key invariants on the orch side:**
+
+- **Cold orch keystore lives only on the firewalled `secure-orch` host.**
+  Signs round txs (via `protocol-daemon`) and the rooted manifest (via
+  `secure-orch-console` → publisher daemon).
+- **Workers run their own publisher daemon** that signs only their own
+  leaf manifest fragment — *not* the rooted manifest. (Open
+  architectural question — see end of this doc.)
+- **`livepeer-orch-coordinator` is the only public orch-side host that
+  holds no keys and mounts no daemon sockets.** Verifies signatures on
+  read; that's it.
+
+### Gateway / customer side
+
+The gateway operator runs one host archetype. Customer traffic enters
+here; payment tickets and resolved worker URLs leave here heading at the
+worker-orch hosts above.
+
+```mermaid
+flowchart LR
+    subgraph internet["public internet"]
+        CUST["customer<br/>(or Pipeline SaaS)"]
     end
 
     subgraph gw_host["gateway host (gateway operator) — public"]
@@ -130,57 +182,53 @@ flowchart LR
         GW_HOTKEY[("gateway hot wallet")]
     end
 
+    WORKER_OPAQUE["worker-orch host × N<br/>(see orch-side diagram above)"]
+    OC_OPAQUE["orch-coordinator<br/>(see orch-side diagram above)"]
+
     subgraph chain["Arbitrum One"]
         CHAIN_C["TicketBroker · ServiceRegistry<br/>· BondingManager · RoundsManager"]
     end
 
     CUST -- "HTTPS<br/>Authorization: Bearer api-key" --> GW_APP
-    GW_APP -- "HTTPS + ticket header" --> WN
+
     GW_APP <-- "unix socket" --> GW_PD
     GW_APP <-- "unix socket" --> GW_SR
     GW_CON <-- "unix sockets" --> GW_PD
     GW_CON <-- "unix sockets" --> GW_SR
-
-    WN <-- "unix socket" --> W_PD
-    WN <-- "unix socket" --> W_SR
-    WN -- "HTTP (localhost)" --> W_BACKEND
-
-    SO_CON <-- "unix sockets" --> PRD
-    SO_CON <-- "unix sockets" --> SO_SR
-
-    GW_SR -- "HTTPS<br/>manifest fetch + verify" --> OC
-    SO_SR -. "manifest upload<br/>(manual today)" .-> OC
-
-    PRD --> CHAIN_C
-    GW_PD --> CHAIN_C
-    W_PD --> CHAIN_C
-    GW_SR --> CHAIN_C
-    SO_SR --> CHAIN_C
-    OC --> CHAIN_C
-
-    COLD --- PRD
-    COLD --- SO_SR
-    W_DUMMY --- W_PD
     GW_HOTKEY --- GW_PD
+
+    GW_APP -- "HTTPS + ticket header" --> WORKER_OPAQUE
+    GW_SR -- "HTTPS<br/>manifest fetch + verify" --> OC_OPAQUE
+
+    GW_PD --> CHAIN_C
+    GW_SR --> CHAIN_C
 ```
 
-**Key invariants this view enforces:**
+**Key invariants on the gateway side:**
 
-- **Cold orch keystore lives only on the firewalled `secure-orch` host.**
-  It signs round txs (via `protocol-daemon`) and the rooted manifest (via
-  `secure-orch-console` → publisher daemon).
-- **Workers run a publisher daemon** that signs only their own leaf
-  manifest fragment — *not* the rooted manifest. (Open architectural
-  question — see end of this doc.)
-- **Gateway hot wallet is on the gateway host**, owned by a different
-  entity than the orchestrator. Used by the sender daemon to sign
-  probabilistic tickets.
-- **All daemon access is unix-socket only.** No cross-host gRPC. Anything
-  crossing a host boundary is HTTPS, and all of it ends up at the chain
-  (RPC) or at a customer-facing endpoint (`Authorization: Bearer`).
-- **`livepeer-orch-coordinator` is the only public host that holds no
-  keys and mounts no daemon sockets.** Verifies signatures on read; that's
-  it.
+- **Gateway hot wallet lives on the gateway host**, owned by a
+  different entity than the orchestrator. Used by the sender daemon to
+  sign probabilistic tickets.
+- **The customer-facing API is the only ingress** — `Authorization: Bearer`
+  on every request. No internal-only sockets between application code
+  (e.g., Pipeline) and gateways; even Cloud-SPE's own consumer apps
+  use the public API.
+- **`livepeer-gateway-console`** mounts the same two daemon sockets the
+  app does, but for read-only routing dashboard / sender wallet status
+  / manual `Resolver.Refresh()`. It does not sit in any per-request path.
+
+### Suite-wide invariants
+
+Both diagrams share these:
+
+- **All daemon access is unix-socket only.** No cross-host gRPC.
+  Anything crossing a host boundary is HTTPS (or chain RPC).
+- **127.0.0.1 bind for every operator-facing app.** Operators front
+  with their own reverse proxy (Traefik / nginx / Caddy / cloudflared /
+  Tailscale Funnel). The compose files ship Traefik labels as a
+  starting point; ignorable.
+- **No OIDC, no sessions, no cookies.** Bearer tokens at the
+  application layer, full stop.
 
 The `livepeer-up-installer` doesn't appear above — it runs **once** on
 each host to materialize `compose.yaml` + `.env` + placeholder keystore,
@@ -556,16 +604,49 @@ posture:
 | BYO reverse proxy | ✓ | ✓ | ✓ |
 | Bearer-token auth | ✓ | ✓ | ✓ |
 
-## OpenAI workload — end-to-end request flow
+## OpenAI workload — end-to-end flow
 
-A customer's chat completion request, gateway ingress to settlement
-on a worker-orch. Includes the USD ↔ ETH translation and the Stripe
-top-up loop.
+Two sub-flows: the **Stripe top-up loop** (one-time, async; how USD lands
+in the customer's ledger) and the **per-request flow** (where USD ↔ ETH
+translation happens on the hot path). Splitting them out keeps the
+per-request diagram readable.
+
+### Stripe top-up loop
+
+How a customer's USD balance gets credited. Decoupled from any chat
+request — runs on its own schedule.
 
 ```mermaid
 sequenceDiagram
     actor Cust as Customer
     participant Stripe
+    participant GW as livepeer-openai-gateway<br/>(Fastify shell)
+    participant DB as Postgres ledger
+
+    Cust->>GW: POST /v1/billing/topup<br/>Authorization: Bearer api-key
+    GW->>Stripe: create Checkout Session
+    Stripe-->>GW: session URL
+    GW-->>Cust: Checkout URL
+    Cust->>Stripe: pay
+    Stripe->>GW: POST /v1/stripe/webhook<br/>checkout.session.completed (signed)
+    GW->>GW: verify webhook signature
+    GW->>DB: credit customer balance (USD)
+    GW-->>Stripe: 200 OK
+```
+
+**First top-up auto-upgrades** a Free customer to Prepaid atomically
+with the credit (single transaction). Disputes (`charge.dispute.created`)
+mark the topup disputed and pause the customer until resolved.
+
+### Per-request flow (USD → ETH → settlement → USD debit)
+
+A single chat completion, from gateway ingress to settlement on a
+worker-orch. No Stripe in this path — the customer's USD balance must
+already be credited.
+
+```mermaid
+sequenceDiagram
+    actor Cust as Customer
     participant GW as livepeer-openai-gateway<br/>(Fastify shell)
     participant DB as Postgres ledger
     participant Eng as livepeer-openai-gateway-core<br/>(npm engine)
@@ -576,19 +657,11 @@ sequenceDiagram
     participant TB as TicketBroker<br/>(chain)
     participant Backend as inference backend<br/>(vLLM / whisper / etc.)
 
-    Note over Cust,Stripe: Top-up (one-time, async)
-    Cust->>GW: POST /v1/billing/topup
-    GW->>Stripe: Checkout Session
-    Stripe-->>Cust: Checkout URL
-    Cust->>Stripe: pay
-    Stripe->>GW: webhook checkout.session.completed
-    GW->>DB: credit customer balance (USD)
-
-    Note over Cust,Backend: Per-request flow
     Cust->>GW: POST /v1/chat/completions<br/>Authorization: Bearer api-key
     GW->>DB: SELECT … FOR UPDATE balance
     DB-->>GW: balance OK
     GW->>Eng: dispatch
+
     Eng->>Resolver: Resolver.Select(capability)
     Resolver-->>Eng: pick (orch_addr, worker_uri)
     Eng->>Sender: CreatePayment(faceValue, recipient=orch_addr)
@@ -607,15 +680,15 @@ sequenceDiagram
     Eng-->>GW: response
 
     GW->>DB: debit USD-cents (atomic, FOR UPDATE)
-    GW-->>Cust: OpenAI-shaped response (USD debited, never wei)
+    GW-->>Cust: OpenAI-shaped response<br/>(USD debited, never wei)
 ```
 
 **Key invariants (from `livepeer-openai-gateway`'s core beliefs):**
 
 - **Customer never sees wei.** USD-cents on the customer surface; ETH
   micropayments only on the network side.
-- **Atomic ledger debits.** `SELECT … FOR UPDATE` for both reserve and
-  commit. No read-modify-write.
+- **Atomic ledger debits.** `SELECT … FOR UPDATE` for both balance check
+  and commit. No read-modify-write.
 - **Fail-closed on payment-daemon outage** → 502/503. Billing never
   proceeds without payment.
 - **Token audit is observation-only.** `tiktoken` local counts cross-
