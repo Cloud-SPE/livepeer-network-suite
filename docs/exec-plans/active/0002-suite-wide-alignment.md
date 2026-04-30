@@ -7,7 +7,7 @@ owner: human (the meta-repo operator)
 
 # Suite-wide alignment
 
-A consolidated punch-list for converging conventions across the 13
+A consolidated punch-list for converging conventions across the 14
 submodules. Sourced from the drift map in
 [`design-docs/suite-conventions.md`](../../design-docs/suite-conventions.md).
 
@@ -20,7 +20,7 @@ they overlap in places (renames cascade through code, configs, and docs).
 Group by leverage. Items at the top unblock or simplify items below them.
 
 1. **High leverage** (fix once, ripples through everything else):
-   - Item 1 — split `livepeer-video-platform`
+   - ~~Item 1 — split `livepeer-video-platform`~~ (RESOLVED 2026-04-29 — see plan 0003 §D)
    - Item 2 — create `livepeer-modules-conventions` (or kill the references)
    - Item 3 — share daemon protos
 2. **Medium leverage** (visible drift, mechanical fixes):
@@ -38,29 +38,20 @@ Group by leverage. Items at the top unblock or simplify items below them.
 
 ---
 
-## Item 1 — split `livepeer-video-platform` into shell + worker repos
+## ~~Item 1 — split `livepeer-video-platform` into shell + worker repos~~ (RESOLVED 2026-04-29)
 
-The OpenAI and VTuber pairs ship as separate repos; `livepeer-video-platform`
-is the only monorepo. Per user direction (2026-04-28), split-repo is the
-suite-wide convention.
+**Resolution:** done in plan 0003 §D as part of the v3.0.0 coordinated
+cut. `livepeer-video-platform/apps/api/` was extracted to
+`Cloud-SPE/livepeer-video-gateway` (Option A) and
+`livepeer-video-platform/apps/transcode-worker-node/` was extracted to
+`Cloud-SPE/video-worker-node` (worker drops the `livepeer-` prefix per
+convention). The meta-repo dropped the `livepeer-video-platform` pin and
+added the two new pins in the v3.0.0 wave (commits 878b981, 00243f7).
+The bundle dev-stack (`infra/compose.yaml`) moved into
+`livepeer-video-gateway`.
 
-**Move:**
-- Extract `livepeer-video-platform/apps/api/` → new repo `Cloud-SPE/livepeer-video-gateway`.
-- Extract `livepeer-video-platform/apps/transcode-worker-node/` → new repo
-  `Cloud-SPE/video-worker-node` (worker drops the `livepeer-` prefix per
-  convention; today the internal name is `livepeer-video-worker-node` —
-  rename in the same move).
-- Decide the fate of `livepeer-video-platform`:
-  - **Option A:** retire it once both extractions land (preferred — matches
-    the model).
-  - **Option B:** keep it as a "bundle reference" repo with submodules of
-    the two new repos plus the engine + infra/compose (lower-priority).
-- After the split, repin in this meta-repo: drop `livepeer-video-platform`,
-  add `livepeer-video-gateway` + `video-worker-node`.
-
-**Retains:**
-- `infra/compose.yaml` (full dev stack) — moves to one of the split repos
-  or a small `livepeer-video-infra` repo. Pick when splitting.
+See [`0003-archetype-a-deploy-unblock.md`](./0003-archetype-a-deploy-unblock.md)
+§D for the full extraction record.
 
 ## Item 2 — resolve the missing `livepeer-modules-conventions` repo
 
@@ -90,7 +81,7 @@ independently:
 - `livepeer-gateway-console/src/providers/payerDaemon/gen/` + `resolver/gen/`
 - `livepeer-vtuber-gateway` (uses `npm run proto:gen`)
 - `vtuber-worker-node/internal/proto/...`
-- (more once the video-platform split lands)
+- `video-worker-node/internal/proto/...`
 
 **Move:** publish daemon protos as a package. Two routes:
 
@@ -169,8 +160,8 @@ These submodules ship without a license today:
 - `livepeer-vtuber-project` ("TBD before first external release")
 - `livepeer-vtuber-gateway` ("TBD before first external release")
 - `vtuber-worker-node` ("TBD before first external release")
-- `livepeer-video-platform/apps/transcode-worker-node/` ("license TBD")
-- `openai-worker-node` (no LICENSE file at v1.1.3)
+- `video-worker-node` ("license TBD")
+- `openai-worker-node` (no LICENSE file)
 
 The pattern across the suite is: **engines MIT, shells proprietary,
 workers ?**. Workers are the missing decision. Pick one (likely either
@@ -215,9 +206,10 @@ Original (now-superseded) text follows for history:
 
 ## Item 10 (HISTORICAL) — document publisher-on-worker semantics
 
-Two workload workers (`livepeer-video-platform/apps/transcode-worker-node/`
-and `vtuber-worker-node`) co-locate `service-registry-daemon` in
-publisher mode, which contradicts `livepeer-modules`'s host-archetype
+Two workload workers (the pre-v3.0.0
+`livepeer-video-platform/apps/transcode-worker-node/` and
+`vtuber-worker-node`) co-located `service-registry-daemon` in
+publisher mode, which contradicted `livepeer-modules`'s host-archetype
 model.
 
 **Move:** read the publisher's gRPC surface to confirm whether worker

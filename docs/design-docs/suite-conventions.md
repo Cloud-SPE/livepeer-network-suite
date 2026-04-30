@@ -1,6 +1,6 @@
 # Suite conventions and drift map
 
-A **descriptive** snapshot of what's actually true across the 13 submodules
+A **descriptive** snapshot of what's actually true across the 14 submodules
 today, with drift called out. Not prescriptive — alignment work is tracked
 in [`exec-plans/active/0002-suite-wide-alignment.md`](../exec-plans/active/0002-suite-wide-alignment.md).
 
@@ -14,8 +14,8 @@ This doc is the input to that alignment plan. Update both together.
 | Operator scaffolding CLI | `livepeer-up-installer` (repo); `livepeer-up` (binary) | — | none |
 | Operator consoles | `livepeer-<role>-console` | `livepeer-secure-orch-console`, `livepeer-orch-coordinator` _(no -console suffix)_, `livepeer-gateway-console` | `orch-coordinator` doesn't end in `-console` even though it is one |
 | Workload engines (OSS, npm) | `<workload>-core` or `livepeer-<workload>-gateway-core` | `livepeer-openai-gateway-core`, `livepeer-video-core` | inconsistent prefix — OpenAI engine has `livepeer-` and `-gateway-core`; video is just `<workload>-core` |
-| Workload gateways (payer side) | `livepeer-<workload>-gateway` | `livepeer-openai-gateway`, `livepeer-vtuber-gateway` | video shell is at `livepeer-video-platform/apps/api/` (named `livepeer-video-gateway` internally); no top-level `livepeer-video-gateway` repo yet |
-| Workload workers (payee side) | `<workload>-worker-node` (no `livepeer-` prefix) | `openai-worker-node`, `vtuber-worker-node` | video worker is at `livepeer-video-platform/apps/transcode-worker-node/` (named `livepeer-video-worker-node` internally — has the prefix) |
+| Workload gateways (payer side) | `livepeer-<workload>-gateway` | `livepeer-openai-gateway`, `livepeer-video-gateway`, `livepeer-vtuber-gateway` | none — convention now uniform after the v3.0.0 video-platform split |
+| Workload workers (payee side) | `<workload>-worker-node` (no `livepeer-` prefix) | `openai-worker-node`, `video-worker-node`, `vtuber-worker-node` | none — convention now uniform after the v3.0.0 video-platform split |
 | Consumer applications | _no fixed pattern yet_ | `livepeer-vtuber-project` | only one example; convention not established |
 
 **Retired terms** (per
@@ -28,16 +28,16 @@ This doc is the input to that alignment plan. Update both together.
 
 ## Repo strategy per workload type
 
-The user wants split repos to be the suite-wide convention. Today:
+Split repos are the suite-wide convention. As of v3.0.0:
 
 | Workload | Engine | Shell | Worker | Strategy |
 |---|---|---|---|---|
 | OpenAI | `livepeer-openai-gateway-core` (own repo) | `livepeer-openai-gateway` (own repo) | `openai-worker-node` (own repo) | ✅ split |
-| Video | `livepeer-video-core` (own repo) | `livepeer-video-platform/apps/api/` | `livepeer-video-platform/apps/transcode-worker-node/` | ❌ shell + worker bundled |
+| Video | `livepeer-video-core` (own repo) | `livepeer-video-gateway` (own repo) | `video-worker-node` (own repo) | ✅ split |
 | VTuber | _(no engine yet)_ | `livepeer-vtuber-gateway` (own repo) | `vtuber-worker-node` (own repo) | ✅ split (no engine) |
 
-**Convention going forward: split.** The video bundle should be broken
-into `livepeer-video-gateway` + `video-worker-node` to align.
+The pre-v3.0.0 monorepo `livepeer-video-platform` (which bundled
+shell + worker under one tag) was retired in v3.0.0 §D.
 
 ## Languages by component role
 
@@ -45,9 +45,9 @@ into `livepeer-video-gateway` + `video-worker-node` to align.
 |---|---|---|
 | On-chain daemons + chain-glue lib | Go | `livepeer-modules` |
 | Scaffolding CLI | Go | `livepeer-up-installer` |
-| Workload workers (payee) | Go | `openai-worker-node`, `vtuber-worker-node`, `livepeer-video-platform/apps/transcode-worker-node/` |
+| Workload workers (payee) | Go | `openai-worker-node`, `video-worker-node`, `vtuber-worker-node` |
 | Workload engines (npm OSS) | TypeScript | `livepeer-openai-gateway-core`, `livepeer-video-core` |
-| Workload shells (gateways) | TypeScript | `livepeer-openai-gateway`, `livepeer-vtuber-gateway`, `livepeer-video-platform/apps/api/` |
+| Workload shells (gateways) | TypeScript | `livepeer-openai-gateway`, `livepeer-video-gateway`, `livepeer-vtuber-gateway` |
 | Operator consoles | TypeScript | `livepeer-secure-orch-console`, `livepeer-orch-coordinator`, `livepeer-gateway-console` |
 | Consumer applications | Python (+ minimal TS for browser) | `livepeer-vtuber-project` |
 
@@ -145,8 +145,8 @@ publish a shared lint catalog as part of the missing
 
 **75% lines/branches/functions/statements** is universal where declared
 (`livepeer-modules`, `livepeer-openai-gateway`, both engines,
-`livepeer-up-installer`, `livepeer-video-platform`). The few repos
-without explicit coverage gates inherit it from the template.
+`livepeer-up-installer`, `livepeer-video-gateway`, `video-worker-node`).
+The few repos without explicit coverage gates inherit it from the template.
 
 Consistent.
 
@@ -187,26 +187,26 @@ This is a strong invariant. No drift.
 
 ## Versioning across submodules
 
-| Submodule | Latest tag | Status |
+| Submodule | Pinned at | Status |
 |---|---|---|
-| `livepeer-modules` | `v1.0.0` | ✅ |
-| `livepeer-up-installer` | `v0.1.0` | ✅ |
-| `livepeer-secure-orch-console` | `v0.1.3` | ✅ |
-| `livepeer-orch-coordinator` | `v0.1.1` | ✅ |
-| `livepeer-gateway-console` | _(none — pinned to main HEAD)_ | ❌ no tag |
-| `openai-worker-node` | `v1.1.3` | ✅ |
-| `livepeer-openai-gateway` | _(only milestone tags `PRE_OSS_REFACTOR`, `PHASE1_SCAFFOLD`)_ | ❌ no version tag |
-| `livepeer-openai-gateway-core` | `v0.2.0` | ✅ pre-1.0 |
-| `livepeer-video-core` | `v0.2.0` | ✅ pre-1.0 |
-| `livepeer-video-platform` | `v0.2.0` | ✅ (monolithic — covers shell + worker) |
-| `livepeer-vtuber-project` | _(none)_ | ❌ no tag |
-| `livepeer-vtuber-gateway` | _(none — M9 complete)_ | ❌ no tag |
-| `vtuber-worker-node` | _(none — M1 skeleton)_ | ❌ no tag |
+| `livepeer-modules` | `v2.1.0-4` (`8232880`) | ✅ |
+| `livepeer-up-installer` | `v0.1.0-3` (`bd9f3ff`) | ✅ |
+| `livepeer-secure-orch-console` | `v0.2.0-4` (`ed5d8c3`) | ✅ |
+| `livepeer-orch-coordinator` | `v3.0.0` (`0043d64`) | ✅ |
+| `livepeer-gateway-console` | `v0.1.4-4` (`5cecca0`) | ✅ |
+| `openai-worker-node` | `v1.1.2-7` (`6932371`) | ✅ |
+| `livepeer-openai-gateway` | `v3.0.0` (`0442698`) | ✅ |
+| `livepeer-openai-gateway-core` | `v3.0.0` (`bccb3ae`) | ✅ |
+| `livepeer-video-core` | `v0.2.0-1` (`1549853`) | ✅ pre-1.0 |
+| `livepeer-video-gateway` | `v3.0.0` (`96665ee`) | ✅ |
+| `video-worker-node` | `v3.0.0` (`765276b`) | ✅ |
+| `livepeer-vtuber-gateway` | `v3.0.0` (`929938`) | ✅ |
+| `vtuber-worker-node` | `v3.0.0` (`f7f6b36`) | ✅ |
+| `livepeer-vtuber-project` | _(none — `b1bcdac`)_ | ❌ no tag |
 
-**Drift:** five submodules have no version tag. Three of them are
-production-ready or close (`livepeer-openai-gateway`, `livepeer-gateway-console`,
-`livepeer-vtuber-gateway`). Cut `v0.1.0`+ on those before any suite
-release.
+**Drift:** only `livepeer-vtuber-project` lacks a version tag (the
+consumer SaaS is mid-realignment; expect churn). All twelve other
+shipping submodules are tagged after the v3.0.0 coordinated cut.
 
 **Engine versioning:** both engines (`-core` repos) are pre-1.0 and
 warn that `0.x` minor bumps may include breaking changes. Shells must
@@ -363,16 +363,16 @@ adopt it.
 
 ## Open architectural divergences worth resolving
 
-1. **Publisher-mode `service-registry-daemon` on workers** — both
-   `livepeer-video-platform/apps/transcode-worker-node/` and
-   `vtuber-worker-node` co-locate publisher mode; `livepeer-modules`'s
-   host-archetype model says publisher → secure-orch only. Likely a
-   leaf-vs-rooted manifest separation, but undocumented.
+1. ~~**Publisher-mode `service-registry-daemon` on workers**~~ —
+   resolved in v3.0.0. Archetype A is the only deploy pattern: workers
+   are registry-invisible and never run a publisher. See
+   [`exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
+   §1 (resolves [plan 0002 §Item 10](../exec-plans/active/0002-suite-wide-alignment.md#item-10--document-publisher-on-worker-semantics)).
 2. **Engine optional vs required.** OpenAI requires `payment-daemon`
    sidecar; video deliberately doesn't (delegates to operator's
    `WorkerClient` adapter). Pattern divergence — both can coexist, but
    should be explicit per engine.
-3. **Many-engines-per-shell.** `livepeer-video-platform` plans phase-2
+3. **Many-engines-per-shell.** `livepeer-video-gateway` plans phase-2
    AI features that will consume `livepeer-openai-gateway-core`
    alongside `livepeer-video-core`. The engine + shell mental model
    needs an update — shells can compose multiple engines.
@@ -381,3 +381,7 @@ adopt it.
 
 - 2026-04-28: Initial snapshot from 13 submodules. Drift items rolled
   into [`exec-plans/active/0002-suite-wide-alignment.md`](../exec-plans/active/0002-suite-wide-alignment.md).
+- 2026-04-29: v3.0.0 cut — `livepeer-video-platform` retired and
+  replaced by `livepeer-video-gateway` + `video-worker-node`; submodule
+  count is now 14. Publisher-on-worker divergence (Item 10) resolved
+  by archetype-A standardization.

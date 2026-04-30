@@ -55,7 +55,7 @@ flowchart TD
     subgraph workload["Workload binaries — gateway + worker pairs"]
         direction LR
         OAI["OpenAI workload<br/><br/>livepeer-openai-gateway (payer)<br/>openai-worker-node (payee)<br/>+ engine: livepeer-openai-gateway-core"]
-        VID["Video workload<br/><br/>livepeer-video-platform<br/>(shell + worker monorepo)<br/>+ engine: livepeer-video-core"]
+        VID["Video workload<br/><br/>livepeer-video-gateway (payer)<br/>video-worker-node (payee)<br/>+ engine: livepeer-video-core"]
         VTB["VTuber workload<br/><br/>livepeer-vtuber-gateway (payer)<br/>vtuber-worker-node (payee)"]
     end
 
@@ -271,7 +271,7 @@ then exits. Not part of the runtime topology.
 
 ### `livepeer-modules` — on-chain control plane
 
-Pinned at `v1.0.0` (`a109687`).
+Pinned at `v2.1.0-4` (`8232880`).
 
 A Go monorepo with one library and three daemons:
 
@@ -329,7 +329,7 @@ recommended path:
 
 ### `livepeer-up-installer` — operator scaffolding CLI
 
-Pinned at `v0.1.0` (`fb6b3a2`). Image: `tztcloud/livepeer-up:dev`.
+Pinned at `v0.1.0-3` (`bd9f3ff`). Image: `tztcloud/livepeer-up:dev`.
 Distroless static Go binary.
 
 The first thing an operator runs on a new host. It **writes files only** —
@@ -366,7 +366,7 @@ each entry to a 40-char commit SHA. `make sync-templates` bumps the SHAs;
 
 This means **two layers of pinning** exist for the suite:
 
-1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `a109687`).
+1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `8232880`).
 2. **`livepeer-up-installer/templates.lock.json`** pins SHAs of upstream
    sibling repos that supply its templates.
 
@@ -376,7 +376,7 @@ these — see `docs/exec-plans/tech-debt-tracker.md`.
 
 ### `livepeer-secure-orch-console` — cold-key custodian's admin UI
 
-Pinned at `v0.1.3` (`806e55f`). Stack: TypeScript (Fastify + Lit/Vite), the
+Pinned at `v0.2.0-4` (`ed5d8c3`). Stack: TypeScript (Fastify + Lit/Vite), the
 org-standard console pattern called out in `livepeer-modules`'s README.
 
 The operator surface for the **secure-orch** host. Lives behind the firewall
@@ -425,7 +425,7 @@ Tracked in [`exec-plans/tech-debt-tracker.md`](../exec-plans/tech-debt-tracker.m
 
 ### `livepeer-orch-coordinator` — public fleet dashboard + manifest host
 
-Pinned at `v0.1.1` (`591b491`). Stack: same as the secure-orch console (TS,
+Pinned at `v3.0.0` (`0043d64`). Stack: same as the secure-orch console (TS,
 Fastify single-process, Lit + Vite SPA at `operator-console-ui/admin/`,
 Drizzle/SQLite via better-sqlite3, viem for chain reads). Node 20+
 (secure-orch wants 24+, so a single Node 24 install satisfies both).
@@ -575,8 +575,7 @@ starts. Mid-round, queries hit the cache. Operator can hand-trigger
 
 ### `livepeer-gateway-console` — payer-side routing dashboard
 
-Pinned at main HEAD `1bf67d9` (no release tag yet — repo's plan-0001 MVP just
-landed; tag this before the next suite release). Stack: same as the other
+Pinned at `v0.1.4-4` (`5cecca0`). Stack: same as the other
 two consoles (TS, Fastify single-process, Lit + Vite SPA at `bridge-ui/admin/` _(upstream dir name; pending rename — see `exec-plans/active/0001-upstream-naming-cleanup.md`)_,
 Drizzle/SQLite via better-sqlite3, viem, `@grpc/grpc-js`, pino). Node 20+.
 
@@ -755,7 +754,7 @@ pairs:
 | Workload | Engine (npm) | Shell + adapters | Payee worker | Repo strategy |
 |---|---|---|---|---|
 | OpenAI APIs | `livepeer-openai-gateway-core` | `livepeer-openai-gateway` | `openai-worker-node` | Three separate repos, independently versioned |
-| Video (VOD + Live HLS) | `livepeer-video-core` | `livepeer-video-platform/apps/api/` (`livepeer-video-gateway`) | `livepeer-video-platform/apps/transcode-worker-node/` (`livepeer-video-worker-node`) | Engine separate; **shell + worker bundled in one monorepo with a single tag** |
+| Video (VOD + Live HLS) | `livepeer-video-core` | `livepeer-video-gateway` | `video-worker-node` | Three separate repos, independently versioned |
 | VTuber (`livepeer:vtuber-session`) | _(none — direct shell, no engine yet)_ | `livepeer-vtuber-gateway` | `vtuber-worker-node` (forwards to a separate `session-runner` in `livepeer-vtuber-project`) | Shell + worker as **separate repos** (like OpenAI), each forked from the corresponding OpenAI sibling skeleton. ADR-003 mandates **no shared source code** — common patterns kept in sync via byte-equivalence property tests instead |
 
 Future workload types (transcode, custom) are expected to follow the same
@@ -769,7 +768,7 @@ shape.
 
 ### `openai-worker-node` — payee-side OpenAI adapter
 
-Pinned at `v1.1.3` (`72653f9`). Go binary, distroless image (Cloud-SPE
+Pinned at `v1.1.2-7` (`6932371`). Go binary, distroless image (Cloud-SPE
 convention).
 
 The HTTP front for one or more inference backends on a worker-orch host.
@@ -823,9 +822,7 @@ post-scaffold state. Captured in tech-debt.
 
 ### `livepeer-openai-gateway` — payer-side OpenAI adapter
 
-Pinned at main HEAD `65a1002` (no release tag yet — only milestone tags
-`PRE_OSS_REFACTOR` and `PHASE1_SCAFFOLD`; tag a real version before next
-suite release). Stack: TypeScript / Fastify single-process / Drizzle +
+Pinned at `v3.0.0` (`0442698`). Stack: TypeScript / Fastify single-process / Drizzle +
 **Postgres** (not SQLite — billing data) / Redis / Stripe SDK /
 `@grpc/grpc-js` / viem / tiktoken / pino. Layered architecture per the
 harness PDF (`types → config → providers → repo → service → runtime → main`).
@@ -872,7 +869,7 @@ ESLint rules:
 
 The routing/dispatch/inference engine has been carved out and published as
 [`@cloudspe/livepeer-openai-gateway-core`](https://github.com/Cloud-SPE/livepeer-openai-gateway-core)
-on npm (currently `0.2.0`). This monorepo is now the **proprietary shell**
+on npm (currently `3.0.0`). This repo is now the **proprietary shell**
 — billing, Stripe, customer portal, admin SPA — that consumes the engine
 via its npm dep.
 
@@ -907,7 +904,7 @@ the READMEs is stale. Captured in tech-debt.
 
 ### `livepeer-openai-gateway-core` — OSS engine consumed by the gateway shell
 
-Pinned at `v0.2.0` (`bc7557f`). Pure TypeScript engine published to npm as
+Pinned at `v3.0.0` (`bccb3ae`). Pure TypeScript engine published to npm as
 [`@cloudspe/livepeer-openai-gateway-core`](https://www.npmjs.com/package/@cloudspe/livepeer-openai-gateway-core).
 Pre-1.0 versioning — breaking changes may land in any minor release;
 post-1.0 will be strict semver.
@@ -947,26 +944,20 @@ without the registry daemon is unsupported. Both sidecars are mandatory:
 #### Engine ↔ shell version coupling
 
 `livepeer-openai-gateway` consumes this engine as an npm dep at a pinned
-version (today `0.2.0`). With both repos now in this meta-repo, the
+version (today `3.0.0`). With both repos now in this meta-repo, the
 version coupling is **doubly tracked**:
 
-1. `.gitmodules` pins the engine source at `v0.2.0` (`bc7557f`).
-2. `livepeer-openai-gateway/package.json` pins the npm dep `@cloudspe/livepeer-openai-gateway-core@0.2.0`.
+1. `.gitmodules` pins the engine source at `v3.0.0` (`bccb3ae`).
+2. `livepeer-openai-gateway/package.json` pins the npm dep `@cloudspe/livepeer-openai-gateway-core@3.0.0`.
 
 These must agree. Crosschecking is captured in tech-debt — once
 implemented, `scripts/sync-submodules.sh --verify` should parse the
 shell's `package-lock.json` and assert it matches the engine submodule's
 tagged version.
 
-#### Reference path forward
-
-Pre-1.0 means the engine is the place to watch for breaking changes that
-ripple into every shell built on it. When a `0.x` minor lands upstream,
-the shell needs a deliberate bump — don't auto-update.
-
 ### `livepeer-video-core` — OSS video engine (VOD + Live HLS)
 
-Pinned at `v0.2.0` (`3d01c16`). Pure TypeScript engine published to npm as
+Pinned at `v0.2.0-1` (`1549853`). Pure TypeScript engine published to npm as
 `@cloudspe/video-core`. Pre-1.0 versioning, same conventions as the
 OpenAI engine. MIT-licensed.
 
@@ -1031,11 +1022,11 @@ sidecars as required, instead delegating ticket creation to the
 operator's `WorkerClient` adapter ("dispatch to a worker URL with a
 payment ticket header").
 
-In practice the reference shell `livepeer-video-platform` (not yet in
-suite) presumably wires the same `payment-daemon` sender into a
-`WorkerClient` adapter, but the engine itself doesn't require it. That's
-a deliberate looser coupling — letting `livepeer-video-core` work with
-non-Livepeer workers if a non-ticket payment scheme is desired.
+In practice the reference shell `livepeer-video-gateway` wires the same
+`payment-daemon` sender into a `WorkerClient` adapter, but the engine
+itself doesn't require it. That's a deliberate looser coupling —
+letting `livepeer-video-core` work with non-Livepeer workers if a
+non-ticket payment scheme is desired.
 
 #### What this engine is not
 
@@ -1048,56 +1039,60 @@ Per the README:
 - **Not framework-coupled.** Fastify is one optional adapter; the
   dispatchers themselves don't import any HTTP framework.
 
-### `livepeer-video-platform` — proprietary shell + worker
+### `livepeer-video-gateway` — payer-side video shell
 
-Pinned at `v0.2.0` (`17dad2e`). Hybrid Go + TypeScript monorepo. Bundles
-**three components** in one tree, with one umbrella git tag:
-
-| Component | Path | Lang | License | Role |
-|---|---|---|---|---|
-| `@cloudspe/video-core` | external (consumed via npm) | TS | MIT (engine) | OSS engine — same as the `livepeer-video-core` submodule |
-| `livepeer-video-gateway` | `apps/api/` | TS | proprietary (shell) | The shell wiring production adapters into the engine |
-| `livepeer-video-worker-node` | `apps/transcode-worker-node/` | Go | TBD | The payee-side worker that actually encodes |
+Pinned at `v3.0.0` (`96665ee`). Stack: TypeScript / Fastify / Drizzle
++ Postgres / Redis / `@grpc/grpc-js` / pino. Proprietary shell — wires
+production adapters (Postgres ledger, S3-compatible storage, webhook
+delivery, etc.) into `@cloudspe/video-core` and exposes the customer
+API.
 
 The Mux-inspired feature set: direct uploads, asset playback, live
 streaming, signed URLs, webhooks. **Not Mux-API-compatible** — feature
-set + resource model is modeled after Mux's, but the HTTP API surface is
-different. Customers porting from Mux must update client code, not just
-the base URL.
+set + resource model are modeled after Mux's, but the HTTP API surface
+is different. Customers porting from Mux must update client code, not
+just the base URL.
 
-#### Repo strategy diverges from the OpenAI pair
+#### Repo strategy: same as OpenAI and VTuber
 
-The OpenAI side ships shell and worker as **separate repos**
-(`livepeer-openai-gateway` + `openai-worker-node`), each with its own
-release cycle. The video side ships them **together in one monorepo**
-with a monolithic tag covering shell + worker. The engine is external
-in both cases.
+After the v3.0.0 split, the video workload follows the same three-repo
+pattern as the OpenAI side: engine (`livepeer-video-core`, OSS, npm) +
+shell (`livepeer-video-gateway`, proprietary) + worker
+(`video-worker-node`). The pre-v3.0.0 monorepo `livepeer-video-platform`
+that bundled shell + worker has been retired (see plan
+[`0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
+§D).
 
-That's a real choice with trade-offs:
+#### Daemon dependencies
 
-| | OpenAI (split) | Video (monorepo) |
-|---|---|---|
-| Coordinated shell + worker release | Two coordinated tags | One tag |
-| Independent shell or worker bump | Easy | Requires monorepo discipline |
-| Cross-component refactors | Two PRs | One PR |
-| Shell language ↔ worker language | Different teams ok | Hybrid build cost |
+The shell co-locates with a `payment-daemon` in **sender** mode for
+ticket creation, and a `service-registry-daemon` in **resolver** mode
+to find workers — same sidecars as `livepeer-openai-gateway`.
 
-Either is defensible; just worth knowing they diverge. The OpenAI side's
-split also means `openai-worker-node` could in principle be reused by a
-non-Cloud-SPE shell; the video worker is more tightly coupled to its
-sibling shell.
+### `video-worker-node` — payee-side video worker
 
-#### Daemon dependencies (and a deployment-topology surprise)
+Pinned at `v3.0.0` (`765276b`). Go (~270 KB at scaffold, more after
+the Phase 2 code lift). Workload-only Go daemon that performs
+FFmpeg-subprocess transcoding. Sister of `openai-worker-node` — same
+scaffolding pattern, different workload.
 
-The shell (`livepeer-video-gateway`) co-locates with a `payment-daemon`
-in **sender** mode for ticket creation, same as `livepeer-openai-gateway`.
+#### Runtime modes and build variants
 
-The worker (`livepeer-video-worker-node`) co-locates with a `payment-daemon`
-in **receiver** mode for ticket validation. Same as `openai-worker-node`.
-It also co-locates a `service-registry-daemon` in **publisher** mode —
-confirmed as a real pattern (not a typo) once `vtuber-worker-node` showed
-the same shape. See the open-architectural-question at the bottom of
-this file.
+- **Three runtime modes** (`--mode=vod|abr|live`) — pick one per process.
+- **Three GPU build variants** (NVIDIA / Intel / AMD) — same source, three Docker tags.
+
+#### Workload contracts
+
+- HTTP `/v1/video/*` + `/stream/*` (`:8081`)
+- RTMP ingest (`:1935`)
+- Prometheus `/metrics` (`:9091`)
+- gRPC into `payment-daemon` (receiver) over a local unix socket
+
+Per the v3.0.0 archetype-A standardization (see
+[`exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
+§1), the worker is **registry-invisible**: it does not run a publisher
+sidecar. The orch publishes the worker's capability in the rooted
+manifest from `secure-orch`.
 
 #### End-to-end video flow (VOD upload)
 
@@ -1109,13 +1104,13 @@ completion events.
 ```mermaid
 sequenceDiagram
     actor Cust as Customer
-    participant GW as video-platform shell<br/>(apps/api)
+    participant GW as livepeer-video-gateway<br/>(shell)
     participant DB as Postgres ledger
     participant Eng as livepeer-video-core<br/>(npm engine)
     participant Storage as StorageProvider<br/>(S3 / R2 / MinIO)
     participant Resolver as service-registry-daemon<br/>resolver
     participant Sender as payment-daemon<br/>sender
-    participant Worker as video-worker-node<br/>(in same monorepo)
+    participant Worker as video-worker-node<br/>(payee)
     participant Webhook as customer<br/>webhook endpoint
 
     Note over Cust,Storage: Step 1 — create upload, push bytes
@@ -1158,10 +1153,10 @@ way `vtuber-session` does (see VTuber flow below).
 
 #### Future cross-engine consumption (planned)
 
-The README says the video platform **will consume `livepeer-openai-gateway-core`**
+`livepeer-video-gateway` is planned to consume `livepeer-openai-gateway-core`
 in phase 2 for AI-augmented features (auto-captions, scene tagging, AI
-thumbnails). That's a future cross-engine dependency: video-platform's
-shell would import both `@cloudspe/video-core` and
+thumbnails). That's a future cross-engine dependency: the video shell
+would import both `@cloudspe/video-core` and
 `@cloudspe/livepeer-openai-gateway-core` from npm.
 
 When that lands, the engine + shell pattern needs an update to its mental
@@ -1169,17 +1164,16 @@ model: shells can compose multiple engines, not just one.
 
 #### Dev stack
 
-A full `infra/compose.yaml` brings up Postgres, MinIO (S3-compatible
-storage for VOD assets), Redis, both daemons, the worker, the shell, and
-a playback origin. `./scripts/demo.sh` runs an end-to-end VOD + Live
-walkthrough.
+A full `infra/compose.yaml` (in `livepeer-video-gateway`) brings up
+Postgres, MinIO (S3-compatible storage for VOD assets), Redis, both
+daemons, the worker, the shell, and a playback origin. `./scripts/demo.sh`
+runs an end-to-end VOD + Live walkthrough.
 
 #### Worker license is TBD
 
-The components table in the README marks `livepeer-video-worker-node` as
-"license TBD." Engine is MIT; shell is proprietary; worker still
-unresolved. Worth surfacing for the user — it'll affect whether
-operators can fork the worker.
+`video-worker-node` is "license TBD." The video engine is MIT; the
+shell is proprietary; the worker is still unresolved. Worth surfacing
+for the user — it'll affect whether operators can fork the worker.
 
 ## Consumer applications
 
@@ -1271,7 +1265,7 @@ churn.
 
 ### `livepeer-vtuber-gateway` — payer-side gateway for the vtuber workload
 
-Pinned at main HEAD `7138f39` (no tag yet). TypeScript / Fastify.
+Pinned at `v3.0.0` (`929938`). TypeScript / Fastify.
 Structurally **forked from the `livepeer-openai-gateway` skeleton** — same
 layered architecture, same Stripe top-up flow, same Drizzle/Postgres
 ledger, same lint plugin shape. Per ADR-003 (in `livepeer-vtuber-project`),
@@ -1444,7 +1438,7 @@ until M2-M4 land on the worker.
 
 ### `vtuber-worker-node` — payee-side worker for the vtuber workload
 
-Pinned at main HEAD `52a0336` (no tag yet). Go (~270 KB). Note the
+Pinned at `v3.0.0` (`f7f6b36`). Go (~270 KB). Note the
 naming: workers don't get the `livepeer-` prefix (matches
 `openai-worker-node`); gateways do (`livepeer-openai-gateway`,
 `livepeer-vtuber-gateway`). Consistent with the OpenAI sibling pair.
@@ -1486,7 +1480,7 @@ Same overall shape:
   harness pattern as the TS repos: enforce invariants mechanically with
   custom lints carrying remediation hints.
 
-Two divergences worth flagging:
+One divergence worth flagging:
 
 1. **The worker is a thin payment+routing layer, not a full module.**
    It forwards session-open requests to a separate `session-runner`
@@ -1497,38 +1491,16 @@ Two divergences worth flagging:
    different repo. **Tighter coupling than the OpenAI side, with the
    coupling deliberately reaching into a sibling submodule.**
 
-2. **Co-locates `service-registry-daemon` in publisher mode.** This is
-   a real pattern, not a typo (now confirmed — `livepeer-video-platform`
-   does the same thing). See the host-archetype note below.
+#### Archetype A: workers do not run a publisher
 
-#### Host-archetype divergence: workers run publishers
-
-`livepeer-modules`'s host-archetype model puts `service-registry-daemon`
-in **publisher mode only on `secure-orch`** (the cold-key custodian
-host, behind a firewall). Both workload-binaries that have a worker
-component now — `livepeer-video-platform/apps/transcode-worker-node/` and
-`vtuber-worker-node` — co-locate a publisher daemon **on the worker
-host itself**.
-
-This is a real architectural divergence from the original `livepeer-modules`
-deployment model. Two interpretations:
-
-- **The model has shifted** — workers are now expected to sign their
-  own capability fragments rather than have all signing concentrated on
-  a cold-key host. This is more decentralized but moves the signing key
-  to internet-facing hosts.
-- **Publisher means different things in the two contexts** — perhaps
-  the worker-side publisher signs only its own per-worker manifest
-  fragment, while the secure-orch publisher signs the rooted manifest
-  that points at the workers. Then both can coexist.
-
-The second interpretation matches what we know from earlier submodules:
-`livepeer-secure-orch-console` calls `Publisher.BuildAndSign` to
-produce a rooted `registry-manifest.json`; `service-registry-daemon`
-publisher mode on a worker likely produces a leaf manifest that the
-rooted manifest points at. But this isn't documented anywhere in the
-suite yet. Tracked in tech-debt; resolving requires reading the
-publisher's actual gRPC surface.
+The pre-v3.0.0 worker (and the retired `livepeer-video-platform` worker)
+co-located a `service-registry-daemon` in publisher mode. v3.0.0
+finalized **Archetype A as the only deploy pattern** — workers are
+registry-invisible, do not dial publisher daemons, and do not
+self-publish. All capability advertisement happens via the rooted
+manifest that `secure-orch` signs and the coordinator hosts. See
+[`exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
+§1 (resolves [plan 0002 §Item 10](../exec-plans/active/0002-suite-wide-alignment.md#item-10--document-publisher-on-worker-semantics)).
 
 #### Where the design lives
 
@@ -1540,8 +1512,6 @@ design lives upstream in `livepeer-vtuber-project`:
   host.
 - ADR-006 — the streaming-session payment pattern (different from
   per-request payment used by the OpenAI worker).
-- ADR-009 — vtuber leads service-registry adoption; explains why this
-  repo is the first worker to mount the publisher socket.
 
 #### Cross-repo conventions reference
 
@@ -1573,22 +1543,18 @@ Tracked as we go, resolved when more components land:
   to the publisher (auto-probe vs operator-curated `workers.yaml`)?
 - ~~Will future workload types (transcode, video gen, custom) follow the
   same payer/payee adapter shape as the OpenAI pair, or diverge?~~ —
-  **Answered**: yes, they do. The `livepeer-vtuber-gateway` /
-  `vtuber-worker-node` pair structurally forks the OpenAI gateway
-  skeleton (M1 of its build plan); ADR-003 mandates no shared source
-  code, with byte-equivalence pinned via property tests. Video diverges
-  on **packaging** (monorepo) but not on the payer/payee shape itself.
-- ~~**Deployment-topology divergence in `livepeer-video-platform`**~~ —
-  **Confirmed not a typo**: `vtuber-worker-node`'s README also describes
-  co-locating `service-registry-daemon` in publisher mode on the worker.
-  Two workload types now do this. Likely a leaf-vs-rooted-manifest
-  separation (worker publisher signs its own fragment; secure-orch
-  publisher signs the rooted manifest pointing at workers) — but this
-  isn't documented anywhere in the suite yet. **New open question:**
-  what does `service-registry-daemon` publisher mode actually sign on a
-  worker host vs on `secure-orch`? Resolving needs the publisher's
-  gRPC surface.
-- The video platform **plans to consume `livepeer-openai-gateway-core`**
+  **Answered**: yes, they do. All three workloads (OpenAI, video, vtuber)
+  ship as separate engine + shell + worker repos after the v3.0.0 split.
+  ADR-003 mandates no shared source code, with byte-equivalence pinned
+  via property tests.
+- ~~**Deployment-topology divergence: workers running a publisher.**~~ —
+  **Resolved in v3.0.0**: archetype A is now the only deploy pattern.
+  Workers are registry-invisible, never run a publisher, and never dial
+  publisher daemons. All capability advertisement is rooted at
+  `secure-orch`. See
+  [`exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
+  §1.
+- `livepeer-video-gateway` **plans to consume `livepeer-openai-gateway-core`**
   in phase 2 for AI-augmented features (auto-captions, scene tagging,
   AI thumbnails). When that lands, the engine + shell pattern becomes
   many-to-one: a shell composes multiple engines.

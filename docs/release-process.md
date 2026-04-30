@@ -41,10 +41,11 @@ Releases are cut on demand, not on a clock. Drivers:
 5. **Commit and tag.**
    ```bash
    git commit -m "release: <summary>"
-   git tag -s vYYYY.MM.DD-NN -m "release notes"
+   git tag -s vMAJOR.MINOR.PATCH -m "release notes"
    ```
-   Pick one tag convention — date-based (`vYYYY.MM.DD-NN`) or semver (`vMAJOR.MINOR.PATCH`) —
-   and stick with it across the suite.
+   The suite uses **semver** for release tags — the v3.0.0 coordinated cut
+   set the precedent. Submodules tag the same `vMAJOR.MINOR.PATCH` for any
+   coordinated wave; the meta-repo tag pins them together.
 
 6. **Push.**
    ```bash
