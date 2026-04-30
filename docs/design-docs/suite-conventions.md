@@ -189,12 +189,12 @@ This is a strong invariant. No drift.
 
 | Submodule | Pinned at | Status |
 |---|---|---|
-| `livepeer-modules` | `v2.1.0-4` (`8232880`) | ✅ |
+| `livepeer-modules` | `v2.1.0-6` (`2e3ca33`) | ✅ |
 | `livepeer-up-installer` | `v0.1.0-3` (`bd9f3ff`) | ✅ |
-| `livepeer-secure-orch-console` | `v0.2.0-4` (`ed5d8c3`) | ✅ |
-| `livepeer-orch-coordinator` | `v3.0.0` (`0043d64`) | ✅ |
+| `livepeer-secure-orch-console` | `v0.2.0-7` (`d93dd04`) | ✅ |
+| `livepeer-orch-coordinator` | `v3.0.0-2` (`1b84794`) | ✅ |
 | `livepeer-gateway-console` | `v0.1.4-4` (`5cecca0`) | ✅ |
-| `openai-worker-node` | `v1.1.2-7` (`6932371`) | ✅ |
+| `openai-worker-node` | `v1.1.2-11` (`4c8dd81`) | ✅ |
 | `livepeer-openai-gateway` | `v3.0.0` (`0442698`) | ✅ |
 | `livepeer-openai-gateway-core` | `v3.0.0` (`bccb3ae`) | ✅ |
 | `livepeer-video-core` | `v0.2.0-1` (`1549853`) | ✅ pre-1.0 |

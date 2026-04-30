@@ -271,7 +271,7 @@ then exits. Not part of the runtime topology.
 
 ### `livepeer-modules` — on-chain control plane
 
-Pinned at `v2.1.0-4` (`8232880`).
+Pinned at `v2.1.0-6` (`2e3ca33`).
 
 A Go monorepo with one library and three daemons:
 
@@ -366,7 +366,7 @@ each entry to a 40-char commit SHA. `make sync-templates` bumps the SHAs;
 
 This means **two layers of pinning** exist for the suite:
 
-1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `8232880`).
+1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `2e3ca33`).
 2. **`livepeer-up-installer/templates.lock.json`** pins SHAs of upstream
    sibling repos that supply its templates.
 
@@ -376,7 +376,7 @@ these — see `docs/exec-plans/tech-debt-tracker.md`.
 
 ### `livepeer-secure-orch-console` — cold-key custodian's admin UI
 
-Pinned at `v0.2.0-4` (`ed5d8c3`). Stack: TypeScript (Fastify + Lit/Vite), the
+Pinned at `v0.2.0-7` (`d93dd04`). Stack: TypeScript (Fastify + Lit/Vite), the
 org-standard console pattern called out in `livepeer-modules`'s README.
 
 The operator surface for the **secure-orch** host. Lives behind the firewall
@@ -425,7 +425,7 @@ Tracked in [`exec-plans/tech-debt-tracker.md`](../exec-plans/tech-debt-tracker.m
 
 ### `livepeer-orch-coordinator` — public fleet dashboard + manifest host
 
-Pinned at `v3.0.0` (`0043d64`). Stack: same as the secure-orch console (TS,
+Pinned at `v3.0.0-2` (`1b84794`). Stack: same as the secure-orch console (TS,
 Fastify single-process, Lit + Vite SPA at `operator-console-ui/admin/`,
 Drizzle/SQLite via better-sqlite3, viem for chain reads). Node 20+
 (secure-orch wants 24+, so a single Node 24 install satisfies both).
@@ -768,7 +768,7 @@ shape.
 
 ### `openai-worker-node` — payee-side OpenAI adapter
 
-Pinned at `v1.1.2-7` (`6932371`). Go binary, distroless image (Cloud-SPE
+Pinned at `v1.1.2-11` (`4c8dd81`). Go binary, distroless image (Cloud-SPE
 convention).
 
 The HTTP front for one or more inference backends on a worker-orch host.
