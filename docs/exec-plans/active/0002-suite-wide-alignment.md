@@ -113,15 +113,13 @@ providers-above-repo means providers compose repos.
 repo) — it's slightly more permissive and matches what the engines do
 internally. Update each repo's custom `layer-check` lint to match.
 
-## Item 5 — pick one admin-auth header
+## ~~Item 5 — pick one admin-auth header~~ (RESOLVED 2026-05-01)
 
-- `livepeer-openai-gateway` admin endpoints use `X-Admin-Token`.
-- The 3 operator consoles use `Authorization: Bearer`.
-
-Same security model, different wire shape. **Move:** pick one
-(recommend `Authorization: Bearer` — fewer custom headers, plays nicer
-with proxies + tooling). Update the openai-gateway's `/admin/*` routes
-+ tests + customer-facing docs.
+**Resolved:** suite admin/operator shells use
+`Authorization: Bearer <admin-token>`. Optional `X-Admin-Actor`-style
+headers are attribution metadata only, not auth. `X-Admin-Token` is
+retired wording and should not appear in live docs or current runtime
+contracts.
 
 ## Item 6 — pin daemon image versions to a single source of truth
 

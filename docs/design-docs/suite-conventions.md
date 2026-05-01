@@ -155,14 +155,12 @@ Consistent.
 | Surface | Header | Used by |
 |---|---|---|
 | Customer API | `Authorization: Bearer <api-key>` | `livepeer-openai-gateway`, `livepeer-vtuber-gateway` |
-| Operator admin endpoints | **`X-Admin-Token: <token>`** | `livepeer-openai-gateway` (`/admin/*`) |
-| Operator admin endpoints | **`Authorization: Bearer <admin-token>`** | The 3 operator consoles |
+| Operator admin endpoints | **`Authorization: Bearer <admin-token>`** | `livepeer-openai-gateway` + the 3 operator consoles |
 | Session-scoped child bearers | `Authorization: Bearer vtbs_*` (HMAC + pepper) | `livepeer-vtuber-gateway` WebSocket `/control` |
 | Worker-side WebSocket | `Authorization: Bearer vtbsw_*` (deterministic HMAC from `(pepper, session_id)`) | `livepeer-vtuber-gateway` WebSocket `/worker-control` |
 
-**Drift:** `livepeer-openai-gateway` uses `X-Admin-Token` for admin auth;
-the consoles use `Authorization: Bearer`. Same security model, different
-header. Should pick one.
+**Current rule:** admin/operator shells use bearer auth. Optional
+`X-Admin-Actor`-style headers are attribution metadata only, not auth.
 
 **Pattern worth promoting:** the `vtbs_*` session-scoped child bearer
 (ADR-005 in `livepeer-vtuber-project`) is generalizable to any
@@ -191,26 +189,28 @@ This is a strong invariant. No drift.
 |---|---|---|
 | `livepeer-modules` | `v2.1.0-6` (`2e3ca33`) | ✅ |
 | `livepeer-up-installer` | `v0.1.0-3` (`bd9f3ff`) | ✅ |
-| `livepeer-secure-orch-console` | `v0.2.0-7` (`d93dd04`) | ✅ |
-| `livepeer-orch-coordinator` | `v3.0.0-2` (`1b84794`) | ✅ |
+| `livepeer-secure-orch-console` | `v3.0.1` (`91a5b26`) | ✅ |
+| `livepeer-orch-coordinator` | `v3.0.1` (`1b5d4ed`) | ✅ |
 | `livepeer-gateway-console` | `v0.1.4-4` (`5cecca0`) | ✅ |
-| `openai-worker-node` | `v1.1.2-11` (`4c8dd81`) | ✅ |
-| `livepeer-openai-gateway` | `v3.0.0` (`0442698`) | ✅ |
+| `openai-worker-node` | `v3.0.0-12` (`c969b13`) | ✅ |
+| `livepeer-openai-gateway` | `v3.0.1` (`b77def5`) | ✅ transitional pinned-core runtime |
 | `livepeer-openai-gateway-core` | `v3.0.0` (`bccb3ae`) | ✅ |
-| `livepeer-video-core` | `v0.2.0-1` (`1549853`) | ✅ pre-1.0 |
-| `livepeer-video-gateway` | `v3.0.0` (`96665ee`) | ✅ |
-| `video-worker-node` | `v3.0.0` (`765276b`) | ✅ |
+| `livepeer-video-core` | `v3.0.1` (`a339104`) | ✅ repo tag; package still pre-1.0 |
+| `livepeer-video-gateway` | `v3.0.1` (`06e3b8d`) | ✅ |
+| `video-worker-node` | `v3.0.0-4` (`b586bbd`) | ✅ |
 | `livepeer-vtuber-gateway` | `v3.0.0` (`929938`) | ✅ |
 | `vtuber-worker-node` | `v3.0.0` (`f7f6b36`) | ✅ |
 | `livepeer-vtuber-project` | _(none — `b1bcdac`)_ | ❌ no tag |
 
-**Drift:** only `livepeer-vtuber-project` lacks a version tag (the
-consumer SaaS is mid-realignment; expect churn). All twelve other
-shipping submodules are tagged after the v3.0.0 coordinated cut.
+**Drift:** `livepeer-vtuber-project` still lacks a version tag, and
+`livepeer-openai-gateway` remains intentionally transitional because its
+shell docs are aligned to the v3.0.1 contract while the pinned engine
+runtime is still `livepeer-openai-gateway-core@3.0.0`.
 
-**Engine versioning:** both engines (`-core` repos) are pre-1.0 and
-warn that `0.x` minor bumps may include breaking changes. Shells must
-pin exactly, never auto-update.
+**Engine versioning:** `livepeer-video-core` is still pre-1.0 and may
+take breaking changes in minor bumps; `livepeer-openai-gateway-core` is
+already on the 3.x line. Shells should still pin exactly rather than
+auto-update.
 
 ## Image registry + image versions
 

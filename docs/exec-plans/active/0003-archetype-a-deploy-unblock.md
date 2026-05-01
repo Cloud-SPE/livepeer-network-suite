@@ -19,6 +19,14 @@ architectural question (Item 10 in [plan
 0002](./0002-suite-wide-alignment.md)) about whether workers may
 self-publish to the registry.
 
+> **2026-05-01 note:** this plan is still useful as rollout history, but
+> the live v3.0.1 contract is stricter than some of the original
+> v3.0.0-era planning text below. The current authoritative rules are:
+> `Resolver.Select(capability, offering, tier, min_weight)` with one
+> explicit selected route result; worker `/capabilities` is deleted from
+> the active contract; `worker_eth_address` is orch-only and never
+> reaches gateways.
+
 ## Scope: clean reset, no backwards compatibility
 
 Confirmed 2026-04-29: nothing in this suite has external users, no
@@ -86,9 +94,23 @@ This resolves [plan 0002 Item 10](./0002-suite-wide-alignment.md#item-10--docume
 
 Every gateway in the suite uses the modules-project's
 `service-registry-daemon` in resolver mode as a co-located sidecar over a
-unix socket, calling `Resolver.Select(capability, offering, tier, geo,
-weight)`. (The pre-v3.0.0 RPC named the second parameter `model`; it is
-renamed to `offering` in the v3.0.0 proto rev — see §Decision 4.)
+unix socket, calling
+`Resolver.Select(capability, offering, tier, min_weight)`. The selected
+route returns one explicit result:
+
+- `worker_url`
+- `eth_address`
+- `capability`
+- `offering`
+- `price_per_work_unit_wei`
+- `work_unit`
+- optional `extra`
+- optional `constraints`
+
+There is no v3 geo input on `Select`, and no gateway-visible
+`worker_eth_address`. (The pre-v3.0.0 RPC named the second parameter
+`model`; it is renamed to `offering` in the v3.0.0 proto rev — see
+§Decision 4.)
 Gateways do **not** fetch
 `<serviceURI>/.well-known/livepeer-registry.json` directly; the resolver
 does.
@@ -152,13 +174,13 @@ renames:
 
 There is no naming wart left after v3.0.0.
 
-### 5. Workers expose two endpoints: workload-native `/capabilities` + uniform `/registry/offerings`
+### 5. Workers expose one routable capability endpoint: `/registry/offerings`
 
-Each worker exposes both:
+In v3.0.1, workers expose a uniform **`/registry/offerings`** endpoint
+for routable inventory. Workload-native **`/capabilities` is deleted**
+from the active suite contract and should not be relied on by gateways,
+cores, or coordinators.
 
-- **`/capabilities`** — workload-native. Serves whatever its local
-  consumers need (bridge, dispatcher, diagnostics) in whatever shape
-  fits that workload. Not constrained by the modules schema.
 - **`/registry/offerings`** — uniform across all workers. Returns
   the modules-canonical `capabilities[]` fragment that this worker
   contributes to its orch's manifest. Body shape:
@@ -176,7 +198,12 @@ Each worker exposes both:
     ]
   }
   ```
-  The worker does not know its own `id`/`url`/`region`/`lat`/`lon`
+  Optional top-level `worker_eth_address` may appear in the scrape
+  response for orch-side coordination, but it is orch-internal only:
+  gateways never receive it, and it must be stripped before proposal,
+  signing, and public manifest publication.
+
+  The worker does not know its own `id`/`url`/`region`
   (operator-chosen identity + topology); those are filled in by the
   coordinator's roster row at proposal-compose time.
 
@@ -191,10 +218,12 @@ Both workers and the coordinator run on the public internet, so the
 scrape happens over public HTTPS (operator's reverse proxy in front).
 Auth on the endpoint is **optional, off by default**:
 
-- **Worker:** new env `OFFERINGS_AUTH_TOKEN`. If set, the endpoint
-  requires `Authorization: Bearer <token>`; otherwise plain.
+- **Worker:** optional shared top-level `worker.yaml.auth_token`. If
+  set, the endpoint requires `Authorization: Bearer <token>`;
+  otherwise plain.
 - **Coordinator:** per-worker `offerings_auth_token` field on the
   `fleet_workers` row (operator types it in the SPA next to the URL).
+
   Sent as a bearer if present, omitted otherwise.
 
 The data isn't secret (it ends up in the public signed manifest
@@ -384,14 +413,14 @@ Local plan 0015 cuts `v3.0.0` for this repo. Sequencing dependency:
 modules-project plan 0004 must land first so the proto regen has a
 v3.0.0 contract to target.
 
-#### D.2 — `Cloud-SPE/video-worker-node` (extraction Phase 1 done; code lift pending)
+#### D.2 — `Cloud-SPE/video-worker-node` (runtime now landed; docs/examples swept)
 
-Repo exists as of 2026-04-29 with **pillar docs only** (`AGENTS.md`,
-`DESIGN.md`, `PRODUCT_SENSE.md`, `PLANS.md`, `README.md`,
-`docs/`). **No Go code yet** — it sits at Phase 1 of its own
-[`0001-extract-from-platform.md`](../../../video-worker-node/docs/exec-plans/active/0001-extract-from-platform.md).
-Phases 2–5 (code lift, doc lift, self-sufficient verification) are
-still pending in that plan.
+The repo is no longer docs-only. The runtime now parses shared
+`worker.yaml`, serves `GET /health` + `GET /registry/offerings`, strips
+`backend_url` from its public offerings payload, supports optional
+top-level `auth_token`, and uses the standardized video capability
+strings `video:transcode.vod`, `video:transcode.abr`, and
+`video:live.rtmp`.
 
 The v3.0.0 archetype-A alignment is captured in
 [`0002-v3-archetype-a-alignment.md`](../../../video-worker-node/docs/exec-plans/active/0002-v3-archetype-a-alignment.md),
@@ -410,15 +439,15 @@ Plan 0002 covers:
    `registry_refresh:`, `node_id:`, `public_url:`,
    `operator_address:`, `price_wei_per_unit:` config fields.
 2. **Implement `/registry/offerings`** — uniform modules-canonical
-   capability fragment (per master plan §Decision 5). Optional bearer
-   auth via `OFFERINGS_AUTH_TOKEN` env. Default off.
+   capability fragment (per master plan §Decision 5). Optional auth via
+   shared top-level `worker.yaml.auth_token`.
 3. **Rename `models:` → `offerings:`** in worker.yaml parser.
 4. **Doc updates**: archetype-A framing in `DESIGN.md`/`README.md`,
    strike-through any tech-debt items about registry integration.
 
-The workload-native `/capabilities` response shape (modes, codecs,
-presets, etc.) is **plan 0001 Phase 2's call** — not dictated by this
-master plan. Plan 0002 explicitly inherits whatever 0001 lands.
+The earlier planning text here about a surviving workload-native
+`/capabilities` endpoint is now superseded. In the live v3.0.1 worker
+contract, `/capabilities` should not exist.
 
 Plan 0002 cuts `v3.0.0` for this repo. Sequencing dependency:
 modules-project plan 0004 must land first so `/registry/offerings`'s
@@ -505,7 +534,7 @@ changes span every host role.
 
 | Repo | Code change | Doc change |
 |---|---|---|
-| `openai-worker-node` (pinned `v1.1.3`) | Cuts `v3.0.0`. Rename `capabilities[].models[]` → `capabilities[].offerings[]` in `worker.yaml` parser + `/capabilities` HTTP response (this worker's `/capabilities` shape closely tracks modules canonical, so the rename cascades through it). **Implement `/registry/offerings`** per master plan §Decision 5 (mirror the `/capabilities` body re-shaped into the modules-canonical fragment — `backend_url` stays omitted, same as today's `/capabilities`). Optional bearer auth via existing token convention. | README: "registry-invisible by design; bridge owns customer-facing routing; archetype A on the operator side. The orch-coordinator scrapes `/registry/offerings` to pre-fill the operator's roster." |
+| `openai-worker-node` (pinned `v1.1.3`) | Cuts `v3.0.0`. Rename `capabilities[].models[]` → `capabilities[].offerings[]` in `worker.yaml`, delete the old workload-native `/capabilities` contract, and implement `/registry/offerings` as the canonical worker advertisement endpoint. Public payload omits `backend_url`; optional auth moves to shared top-level `worker.yaml.auth_token`. | README: "registry-invisible by design; bridge owns customer-facing routing; archetype A on the operator side. The orch-coordinator scrapes `/registry/offerings` to pre-fill the operator's roster." |
 | `livepeer-openai-gateway` + `-core` | Cuts `v3.0.0`. Regen resolver proto stubs; rename `models`→`offerings` references in `src/main.ts` and gateway-core resolver client. **Adopt manifest pricing.** The bridge keeps its USD rate card for customer-facing prices, but the orch *wholesale* price input to routing comes from `offerings[i].pricePerWorkUnitWei` in the resolver response — replace the Postgres rate-card-driven wholesale-price logic in `src/service/pricing/` with a manifest-priced read. Workers with empty offering price are skipped (vtuber-gateway pattern). | DESIGN: "customer pricing remains bridge-controlled USD rate card; orch wholesale pricing is read from manifest `offerings[].pricePerWorkUnitWei` and used as the routing-decision input." |
 | `livepeer-vtuber-project` | None — Python pipeline doesn't consume the registry proto directly. Doc-only confirmation. | ADR-009 confirms vtuber-gateway as the canonical embed-pricing pattern; no edits needed beyond a v3.0.0 version-bump note. |
 | `livepeer-vtuber-gateway` | Cuts `v3.0.0`. Regen resolver proto stubs; rename `models`→`offerings`; update `pricePerWorkUnitWei` reader in `src/providers/serviceRegistry/grpc.ts`. | DESIGN: "manifest pricing is the canonical pattern; we read `offerings[i].pricePerWorkUnitWei` directly" |
@@ -620,8 +649,9 @@ PHASE 2 ── consumer cuts (parallel against modules v3.0.0) ─────�
     b) video-worker-node (NEW, from apps/transcode-worker-node):
        - delete capabilityreporter, registryclient
        - drop registry CLI flags + config fields
-       - design + ship workload-native /capabilities shape
        - implement /registry/offerings (modules-canonical fragment)
+       - use canonical video capability names end-to-end
+       - remove workload-native /capabilities from the active v3 contract
        - tag v3.0.0
     livepeer-video-platform: ARCHIVED after extraction.
 
@@ -634,9 +664,10 @@ PHASE 2 ── consumer cuts (parallel against modules v3.0.0) ─────�
     - tag v3.0.0
 
   openai-worker-node:
-    - rename models → offerings in worker.yaml + /capabilities
+    - rename models → offerings in worker.yaml
     - implement /registry/offerings (modules-canonical fragment;
       backend_url omitted as today)
+    - remove workload-native /capabilities from the active v3 contract
     - tag v3.0.0
 
   livepeer-openai-gateway + -core:
@@ -725,13 +756,15 @@ The deploy ships when **all** of:
    `livepeer-video-gateway` and `video-worker-node` exist as standalone
    repos, both tagged v3.0.0; `livepeer-video-platform` archived.
    `livepeer-video-gateway` adopts manifest pricing.
-   `video-worker-node` ships its workload-native `/capabilities`
-   response.
+   `video-worker-node` ships `GET /registry/offerings` and does not
+   expose a live `/capabilities` contract.
 5. **`vtuber-worker-node` v3.0.0** tagged — alignment plan checked
    off; `service_registry_publisher` block gone; `offerings:` in
    worker.yaml.
 6. **`openai-worker-node` v3.0.0** tagged — `models` → `offerings`
-   rename in worker.yaml + `/capabilities`.
+   rename in worker.yaml; `/registry/offerings` is the live worker
+   advertisement endpoint and `/capabilities` is removed from the v3
+   contract.
 7. **`livepeer-openai-gateway` + `-core` v3.0.0** tagged — proto regen,
    rename, manifest-pricing adoption (wholesale price from
    `offerings[].pricePerWorkUnitWei`).
@@ -836,4 +869,3 @@ in particular is structurally cleanest done now: the v3.0.0 cut is
 the natural moment to retire the monorepo, and doing it as a separate
 later wave would mean cutting v3.0.0 against a doomed monorepo and
 churning everything again.
-

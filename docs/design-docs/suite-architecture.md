@@ -7,15 +7,17 @@ the same PR.
 > Status: under construction. Submodules are being added one at a time; this
 > doc grows with each addition.
 
-## v3.0.0 — archetype A is the canonical deployment
+## v3.0.1 — archetype A is the canonical deployment
 
-Effective with the suite-wide v3.0.0 cut (see
+Effective with the suite-wide v3.0.1-aligned cut (see
 [`docs/exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)),
 **archetype A is the only supported deployment**:
 
 - **Workers** (openai-worker-node, vtuber-worker-node, video-worker-node)
   are **registry-invisible**. They do not dial publisher daemons. They
-  expose a uniform `/registry/offerings` HTTP endpoint the
+  expose a uniform `/registry/offerings` HTTP endpoint plus a workload
+  health endpoint; `/capabilities` is not part of the v3 worker contract.
+  The
   orch-coordinator scrapes (per
   [`worker-offerings-endpoint.md`](https://github.com/Cloud-SPE/livepeer-modules/blob/main/service-registry-daemon/docs/design-docs/worker-offerings-endpoint.md)).
 - **Operator** uses the orch-coordinator's SPA to maintain a roster
@@ -25,8 +27,11 @@ Effective with the suite-wide v3.0.0 cut (see
   manifest back, and the coordinator atomic-swaps it to the public
   `/.well-known/livepeer-registry.json`.
 - **Gateways** discover orchs via `service-registry-daemon` (resolver
-  mode) sidecars calling `Resolver.Select(capability, offering, tier,
-  ...)`. Pricing flows from the manifest's `offerings[].price_per_work_unit_wei`.
+  mode) sidecars calling `Resolver.Select(capability, offering, tier, min_weight)`.
+  The selected route returns `worker_url`, `eth_address`, `capability`,
+  `offering`, `price_per_work_unit_wei`, `work_unit`, and optional
+  `extra` / `constraints`. Pricing flows from the selected route's
+  wholesale price, and gateways compute payment locally from that.
 
 The pre-v3.0.0 worker-publisher pattern (workers self-publishing their
 manifests directly) is no longer supported. This resolves the
@@ -376,7 +381,7 @@ these — see `docs/exec-plans/tech-debt-tracker.md`.
 
 ### `livepeer-secure-orch-console` — cold-key custodian's admin UI
 
-Pinned at `v0.2.0-7` (`d93dd04`). Stack: TypeScript (Fastify + Lit/Vite), the
+Pinned at `v3.0.1` (`91a5b26`). Stack: TypeScript (Fastify + Lit/Vite), the
 org-standard console pattern called out in `livepeer-modules`'s README.
 
 The operator surface for the **secure-orch** host. Lives behind the firewall
@@ -425,7 +430,7 @@ Tracked in [`exec-plans/tech-debt-tracker.md`](../exec-plans/tech-debt-tracker.m
 
 ### `livepeer-orch-coordinator` — public fleet dashboard + manifest host
 
-Pinned at `v3.0.0-2` (`1b84794`). Stack: same as the secure-orch console (TS,
+Pinned at `v3.0.1` (`1b5d4ed`). Stack: same as the secure-orch console (TS,
 Fastify single-process, Lit + Vite SPA at `operator-console-ui/admin/`,
 Drizzle/SQLite via better-sqlite3, viem for chain reads). Node 20+
 (secure-orch wants 24+, so a single Node 24 install satisfies both).
@@ -694,9 +699,9 @@ sequenceDiagram
     DB-->>GW: balance OK
     GW->>Eng: dispatch
 
-    Eng->>Resolver: Resolver.Select(capability)
-    Resolver-->>Eng: pick (orch_addr, worker_uri)
-    Eng->>Sender: CreatePayment(faceValue, recipient=orch_addr)
+    Eng->>Resolver: Resolver.Select(capability, offering, tier, min_weight)
+    Resolver-->>Eng: route {worker_url, eth_address, offering, price_per_work_unit_wei, work_unit}
+    Eng->>Sender: CreatePayment(faceValue, recipient=eth_address)
     Sender-->>Eng: signed ticket
 
     Eng->>Worker: HTTPS + X-Livepeer-Payment ticket
@@ -768,7 +773,7 @@ shape.
 
 ### `openai-worker-node` — payee-side OpenAI adapter
 
-Pinned at `v1.1.2-11` (`4c8dd81`). Go binary, distroless image (Cloud-SPE
+Pinned at `v3.0.0-12` (`c969b13`). Go binary, distroless image (Cloud-SPE
 convention).
 
 The HTTP front for one or more inference backends on a worker-orch host.
@@ -822,7 +827,7 @@ post-scaffold state. Captured in tech-debt.
 
 ### `livepeer-openai-gateway` — payer-side OpenAI adapter
 
-Pinned at `v3.0.0` (`0442698`). Stack: TypeScript / Fastify single-process / Drizzle +
+Pinned at `v3.0.1` (`b77def5`). Stack: TypeScript / Fastify single-process / Drizzle +
 **Postgres** (not SQLite — billing data) / Redis / Stripe SDK /
 `@grpc/grpc-js` / viem / tiktoken / pino. Layered architecture per the
 harness PDF (`types → config → providers → repo → service → runtime → main`).
@@ -848,7 +853,8 @@ two daemons `gateway-console` mounts.
   against node-reported counts; drift is metered, not enforced.
 - **Operator endpoints** under `/admin/*` — health, node inspection,
   customer lookup, manual refund, suspend/unsuspend, escrow view. Auth via
-  `X-Admin-Token` (different header from customer's `Authorization: Bearer`).
+  `Authorization: Bearer <admin-token>` plus optional `X-Admin-Actor`
+  attribution.
 - **Two embedded SPAs** — customer portal (top-ups, balance) and operator
   admin SPA (nodes, customers, refunds).
 
@@ -906,8 +912,8 @@ the READMEs is stale. Captured in tech-debt.
 
 Pinned at `v3.0.0` (`bccb3ae`). Pure TypeScript engine published to npm as
 [`@cloudspe/livepeer-openai-gateway-core`](https://www.npmjs.com/package/@cloudspe/livepeer-openai-gateway-core).
-Pre-1.0 versioning — breaking changes may land in any minor release;
-post-1.0 will be strict semver.
+This engine is already on the 3.x line, so normal semver expectations
+apply across future stable releases.
 
 The engine is the **adapter-driven request pipeline** that sits between an
 OpenAI-compatible client and the Livepeer worker pool. It owns the
@@ -957,9 +963,9 @@ tagged version.
 
 ### `livepeer-video-core` — OSS video engine (VOD + Live HLS)
 
-Pinned at `v0.2.0-1` (`1549853`). Pure TypeScript engine published to npm as
-`@cloudspe/video-core`. Pre-1.0 versioning, same conventions as the
-OpenAI engine. MIT-licensed.
+Pinned at `v3.0.1` (`a339104`). Pure TypeScript engine published to npm as
+`@cloudspe/video-core`. Pre-1.0 versioning; breaking changes may still
+arrive in minor bumps until it reaches 1.0. MIT-licensed.
 
 The video equivalent of `livepeer-openai-gateway-core`. Same engine + shell
 pattern, different workload shape: VOD upload + Live HLS rather than
@@ -1041,7 +1047,7 @@ Per the README:
 
 ### `livepeer-video-gateway` — payer-side video shell
 
-Pinned at `v3.0.0` (`96665ee`). Stack: TypeScript / Fastify / Drizzle
+Pinned at `v3.0.1` (`06e3b8d`). Stack: TypeScript / Fastify / Drizzle
 + Postgres / Redis / `@grpc/grpc-js` / pino. Proprietary shell — wires
 production adapters (Postgres ledger, S3-compatible storage, webhook
 delivery, etc.) into `@cloudspe/video-core` and exposes the customer
@@ -1071,7 +1077,7 @@ to find workers — same sidecars as `livepeer-openai-gateway`.
 
 ### `video-worker-node` — payee-side video worker
 
-Pinned at `v3.0.0` (`765276b`). Go (~270 KB at scaffold, more after
+Pinned at `v3.0.0-4` (`b586bbd`). Go (~270 KB at scaffold, more after
 the Phase 2 code lift). Workload-only Go daemon that performs
 FFmpeg-subprocess transcoding. Sister of `openai-worker-node` — same
 scaffolding pattern, different workload.
@@ -1088,7 +1094,7 @@ scaffolding pattern, different workload.
 - Prometheus `/metrics` (`:9091`)
 - gRPC into `payment-daemon` (receiver) over a local unix socket
 
-Per the v3.0.0 archetype-A standardization (see
+Per the v3.0.1 archetype-A standardization (see
 [`exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)
 §1), the worker is **registry-invisible**: it does not run a publisher
 sidecar. The orch publishes the worker's capability in the rooted
@@ -1494,7 +1500,7 @@ One divergence worth flagging:
 #### Archetype A: workers do not run a publisher
 
 The pre-v3.0.0 worker (and the retired `livepeer-video-platform` worker)
-co-located a `service-registry-daemon` in publisher mode. v3.0.0
+co-located a `service-registry-daemon` in publisher mode. v3.0.1
 finalized **Archetype A as the only deploy pattern** — workers are
 registry-invisible, do not dial publisher daemons, and do not
 self-publish. All capability advertisement happens via the rooted
@@ -1548,7 +1554,7 @@ Tracked as we go, resolved when more components land:
   ADR-003 mandates no shared source code, with byte-equivalence pinned
   via property tests.
 - ~~**Deployment-topology divergence: workers running a publisher.**~~ —
-  **Resolved in v3.0.0**: archetype A is now the only deploy pattern.
+  **Resolved in v3.0.1**: archetype A is now the only deploy pattern.
   Workers are registry-invisible, never run a publisher, and never dial
   publisher daemons. All capability advertisement is rooted at
   `secure-orch`. See
