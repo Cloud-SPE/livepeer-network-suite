@@ -701,7 +701,7 @@ sequenceDiagram
 
     Eng->>Resolver: Resolver.Select(capability, offering, tier, min_weight)
     Resolver-->>Eng: route {worker_url, eth_address, offering, price_per_work_unit_wei, work_unit}
-    Eng->>Sender: CreatePayment(faceValue, recipient=eth_address)
+    Eng->>Sender: CreatePayment(requested_spend_wei, recipient, capability, offering)
     Sender-->>Eng: signed ticket
 
     Eng->>Worker: HTTPS + X-Livepeer-Payment ticket
@@ -730,6 +730,13 @@ sequenceDiagram
   proceeds without payment.
 - **Token audit is observation-only.** `tiktoken` local counts cross-
   checked against node-reported counts; drift is metered, not enforced.
+
+The payment-economic details behind that `CreatePayment(...)` call are
+documented centrally in
+[`payment-daemon-interactions.md`](./payment-daemon-interactions.md):
+resolved worker price vs requested spend, receiver-chosen winning-ticket
+face value, expected-value credit, and the runtime knobs that determine
+whether a small request is still redeemable.
 
 `livepeer-gateway-console` reads the resolver socket (routing
 dashboard + audit log + manual Refresh), the sender socket (wallet +

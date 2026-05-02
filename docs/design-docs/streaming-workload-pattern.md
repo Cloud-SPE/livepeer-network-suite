@@ -289,9 +289,10 @@ The gateway:
 
 ## Face-value sizing
 
-This blueprint requires a single pricing rule across workloads:
+This blueprint requires a single gateway-side pricing rule across
+workloads:
 
-`face_value_wei = target_credit_units * price_per_work_unit_wei`
+`requested_spend_wei = target_credit_units * price_per_work_unit_wei`
 
 Where:
 
@@ -306,12 +307,25 @@ explicitly. For example:
 - topup credit sized to 60 seconds
 - low-balance watermark at 30 seconds
 
-If sender/payee ticket economics require a larger redeemable face value
-than the exact commercial target, that adjustment belongs inside the
-payment-daemon ticket-params flow, not in workload-specific ad hoc math.
-The workload-level invariant remains: customer credit and worker debit are
-derived from the resolved `price_per_work_unit_wei` and the consumed work
-units.
+In the current quote-free modules flow, that sender-side field is still
+named `face_value`, but semantically it is a **requested spend / target
+expected value** request. The receiver may answer with:
+
+- a larger actual winning-ticket `FaceValue`, and
+- a lower `win_prob`
+
+so the ticket remains redeemable while the expected spend still matches
+the gateway's requested amount.
+
+If sender/payee ticket economics require a larger redeemable winning
+ticket than the exact commercial target, that adjustment belongs inside
+the payment-daemon ticket-params flow, not in workload-specific ad hoc
+math. The workload-level invariant remains: customer credit and worker
+debit are derived from the resolved `price_per_work_unit_wei` and the
+consumed work units.
+
+See [`payment-daemon-interactions.md`](./payment-daemon-interactions.md)
+for the full sender/receiver economic model.
 
 ## Required worker-to-gateway event contract
 
