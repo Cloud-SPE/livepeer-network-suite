@@ -1344,6 +1344,13 @@ attach), **session-scoped child bearers** (`vtbs_*`) instead of the
 customer's long-lived API key on the WS, and **per-tick billing** over
 WebSocket instead of per-request.
 
+This is the suite's canonical **streaming workload** shape. The
+cross-workload rules live in
+[`streaming-workload-pattern.md`](./streaming-workload-pattern.md):
+worker-side runtime enforcement via receiver-side balance, gateway-side
+commercial ledger, topups against the same live `work_id`, and
+idempotent worker-to-gateway usage events.
+
 ```mermaid
 sequenceDiagram
     participant Pipeline as livepeer-vtuber-project<br/>(Pipeline SaaS)
@@ -1351,6 +1358,7 @@ sequenceDiagram
     participant DB as Postgres ledger
     participant Resolver as service-registry-daemon<br/>resolver
     participant Sender as payment-daemon<br/>sender
+    participant Receiver as payment-daemon<br/>receiver
     participant VTBW as vtuber-worker-node<br/>(M1 — skeleton today)
     participant Runner as session-runner<br/>(in livepeer-vtuber-project)
     participant OAIG as livepeer-openai-gateway
@@ -1358,19 +1366,18 @@ sequenceDiagram
     Note over Pipeline,Runner: Step 1 — open session (HTTP)
     Pipeline->>VTBG: POST /v1/vtuber/sessions<br/>Authorization: Bearer customer-key
     VTBG->>DB: check balance
-    VTBG->>Resolver: Select(capability=livepeer:vtuber-session)
-    Resolver-->>VTBG: vtuber-worker URL
-    VTBG->>VTBW: GET /quote
-    VTBW-->>VTBG: TicketParams
-    VTBG->>Sender: PayerDaemon.StartSession + CreatePayment
+    VTBG->>Resolver: Select(capability=livepeer:vtuber-session, offering)
+    Resolver-->>VTBG: worker URL + recipient + price/work-unit
+    VTBG->>Sender: CreatePayment(face_value, recipient, capability, offering)
     Sender-->>VTBG: ticket
     VTBG->>VTBG: mint vtbs_* (HMAC + pepper, hash-stored)
     VTBG->>VTBW: POST /api/sessions/start<br/>X-Livepeer-Payment ticket<br/>Authorization: Bearer vtbs_*
-    VTBW->>VTBW: validate ticket
+    VTBW->>Receiver: ProcessPayment(payment_bytes, work_id)
+    Receiver-->>VTBW: sender + credited_ev + balance
     VTBW->>Runner: forward session-start
     Runner-->>VTBW: session active
-    VTBW-->>VTBG: 2xx
-    VTBG->>DB: mark session active
+    VTBW-->>VTBG: 2xx + { worker_session_id, work_id }
+    VTBG->>DB: mark session active + persist work_id correlation
     VTBG-->>Pipeline: { session_id, session_child_bearer }
 
     Note over Pipeline,Runner: Step 2 — WebSocket relay (long-lived)
@@ -1379,6 +1386,8 @@ sequenceDiagram
     Note over VTBG: gateway relays frames<br/>between control + worker-control
 
     loop usage tick (continuous)
+        VTBW->>Receiver: DebitBalance(sender, work_id, units)
+        VTBW->>Receiver: SufficientBalance(sender, work_id, min_runway)
         VTBW-->>VTBG: session.usage.tick
         VTBG->>DB: vtuberBilling.recordUsageTick<br/>(debit USD-cents)
     end
@@ -1393,6 +1402,12 @@ gateways in parallel:
 
 - This one (`livepeer-vtuber-gateway`) for vtuber session orchestration.
 - `livepeer-openai-gateway` for nested LLM/TTS calls inside the session.
+
+Older VTuber notes that describe `GET /quote`, `StartSession`, or
+gateway-owned per-tick enforcement should be treated as historical. The
+canonical streaming pattern is the worker-metered / gateway-ledger split
+documented above and in
+[`streaming-workload-pattern.md`](./streaming-workload-pattern.md).
 
 That's the first time the suite has a single product reaching across
 two workload gateways — a stronger validation of the gateway pattern

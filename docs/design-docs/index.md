@@ -6,6 +6,7 @@ Cross-cutting design decisions for the Livepeer Network Suite as a whole.
 |---|---|---|
 | [core-beliefs.md](./core-beliefs.md) | active | Invariants every change must uphold |
 | [suite-architecture.md](./suite-architecture.md) | living | How the submodules layer together (updated as each is added) |
+| [streaming-workload-pattern.md](./streaming-workload-pattern.md) | accepted | Canonical worker-metered / gateway-ledger pattern for long-lived streaming workloads |
 | [suite-conventions.md](./suite-conventions.md) | living | Patterns that emerged across submodules + drift map. Pairs with `exec-plans/active/0002-suite-wide-alignment.md` |
 
 Submodule-local designs live inside their respective submodules. Promote a doc here only when
