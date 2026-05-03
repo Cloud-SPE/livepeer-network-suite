@@ -199,12 +199,12 @@ This is a strong invariant. No drift.
 | `livepeer-video-gateway` | `v4.0.1` (`111c9f5`) | ✅ |
 | `video-worker-node` | `v4.0.1` (`b32951b`) | ✅ |
 | `livepeer-vtuber-gateway` | `v4.0.1` (`d5cf095`) | ✅ |
-| `vtuber-worker-node` | `v3.0.11` (`633049f`) | ✅ latest worker tag on the current line |
+| `vtuber-worker-node` | `v4.0.1` (`633049f`) | ✅ same commit also carries legacy tag `v3.0.11` |
 | `livepeer-vtuber-project` | `v4.0.1` (`5dc46d2`) | ✅ |
 
-**Drift:** the suite is now largely on the `v4.x` line. Two
-notable exceptions remain: `livepeer-modules` has already advanced to
-`v4.0.2`, and `vtuber-worker-node` currently tops out at `v3.0.11`.
+**Drift:** the suite is now largely on the `v4.x` line. The main
+remaining asymmetry is that `livepeer-modules` has already advanced to
+`v4.0.2`.
 
 **Engine versioning:** `livepeer-video-core` is still pre-1.0 and may
 take breaking changes in minor bumps. Shells should still pin exactly

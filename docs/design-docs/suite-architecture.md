@@ -1467,7 +1467,7 @@ sender-flow cut.
 
 ### `vtuber-worker-node` — payee-side worker for the vtuber workload
 
-Pinned at `v3.0.11` (`633049f`). Go (~270 KB at scaffold, larger now with
+Pinned at `v4.0.1` (`633049f`). Go (~270 KB at scaffold, larger now with
 the streaming module and contract tests). Note the
 naming: workers don't get the `livepeer-` prefix (matches
 `openai-worker-node`); gateways do (`livepeer-openai-gateway`,
