@@ -7,9 +7,9 @@ the same PR.
 > Status: under construction. Submodules are being added one at a time; this
 > doc grows with each addition.
 
-## v3.0.1 — archetype A is the canonical deployment
+## v4.0.1 — archetype A is the canonical deployment
 
-Effective with the suite-wide v3.0.1-aligned cut (see
+Effective with the current suite-aligned cut (see
 [`docs/exec-plans/active/0003-archetype-a-deploy-unblock.md`](../exec-plans/active/0003-archetype-a-deploy-unblock.md)),
 **archetype A is the only supported deployment**:
 
@@ -276,7 +276,7 @@ then exits. Not part of the runtime topology.
 
 ### `livepeer-modules` — on-chain control plane
 
-Pinned at `v2.1.0-6` (`2e3ca33`).
+Pinned at `v4.0.2` (`a061b5a`).
 
 A Go monorepo with one library and three daemons:
 
@@ -313,11 +313,11 @@ Workload binaries (transcode, AI workers, OpenAI adapters) are **not** in
 `livepeer-modules` — they live in other submodules and consume the daemon
 gRPC sockets.
 
-#### Published images (v1.0.0)
+#### Published images (v3.0.2)
 
-- `tztcloud/livepeer-payment-daemon:v1.0.0`
-- `tztcloud/livepeer-service-registry-daemon:v1.0.0`
-- `tztcloud/livepeer-protocol-daemon:v1.0.0`
+- `tztcloud/livepeer-payment-daemon:v3.0.2`
+- `tztcloud/livepeer-service-registry-daemon:v3.0.2`
+- `tztcloud/livepeer-protocol-daemon:v3.0.2`
 
 distroless/static, nonroot uid 65532, amd64-only.
 
@@ -334,7 +334,7 @@ recommended path:
 
 ### `livepeer-up-installer` — operator scaffolding CLI
 
-Pinned at `v0.1.0-3` (`bd9f3ff`). Image: `tztcloud/livepeer-up:dev`.
+Pinned at `v4.0.1` (`6e16246`). Image: `tztcloud/livepeer-up:dev`.
 Distroless static Go binary.
 
 The first thing an operator runs on a new host. It **writes files only** —
@@ -371,7 +371,7 @@ each entry to a 40-char commit SHA. `make sync-templates` bumps the SHAs;
 
 This means **two layers of pinning** exist for the suite:
 
-1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `2e3ca33`).
+1. **This meta-repo** pins each submodule (e.g., `livepeer-modules` → `a061b5a`).
 2. **`livepeer-up-installer/templates.lock.json`** pins SHAs of upstream
    sibling repos that supply its templates.
 
@@ -381,7 +381,7 @@ these — see `docs/exec-plans/tech-debt-tracker.md`.
 
 ### `livepeer-secure-orch-console` — cold-key custodian's admin UI
 
-Pinned at `v3.0.1` (`91a5b26`). Stack: TypeScript (Fastify + Lit/Vite), the
+Pinned at `v4.0.1` (`5d2ccc5`). Stack: TypeScript (Fastify + Lit/Vite), the
 org-standard console pattern called out in `livepeer-modules`'s README.
 
 The operator surface for the **secure-orch** host. Lives behind the firewall
@@ -430,7 +430,7 @@ Tracked in [`exec-plans/tech-debt-tracker.md`](../exec-plans/tech-debt-tracker.m
 
 ### `livepeer-orch-coordinator` — public fleet dashboard + manifest host
 
-Pinned at `v3.0.1` (`1b5d4ed`). Stack: same as the secure-orch console (TS,
+Pinned at `v4.0.1` (`b767bfe`). Stack: same as the secure-orch console (TS,
 Fastify single-process, Lit + Vite SPA at `operator-console-ui/admin/`,
 Drizzle/SQLite via better-sqlite3, viem for chain reads). Node 20+
 (secure-orch wants 24+, so a single Node 24 install satisfies both).
@@ -580,7 +580,7 @@ starts. Mid-round, queries hit the cache. Operator can hand-trigger
 
 ### `livepeer-gateway-console` — payer-side routing dashboard
 
-Pinned at `v0.1.4-4` (`5cecca0`). Stack: same as the other
+Pinned at `v4.0.1` (`08e9063`). Stack: same as the other
 two consoles (TS, Fastify single-process, Lit + Vite SPA at `bridge-ui/admin/` _(upstream dir name; pending rename — see `exec-plans/active/0001-upstream-naming-cleanup.md`)_,
 Drizzle/SQLite via better-sqlite3, viem, `@grpc/grpc-js`, pino). Node 20+.
 
@@ -780,7 +780,7 @@ shape.
 
 ### `openai-worker-node` — payee-side OpenAI adapter
 
-Pinned at `v3.0.0-12` (`c969b13`). Go binary, distroless image (Cloud-SPE
+Pinned at `v4.0.1` (`80b2347`). Go binary, distroless image (Cloud-SPE
 convention).
 
 The HTTP front for one or more inference backends on a worker-orch host.
@@ -834,7 +834,7 @@ post-scaffold state. Captured in tech-debt.
 
 ### `livepeer-openai-gateway` — payer-side OpenAI adapter
 
-Pinned at `v3.0.1` (`b77def5`). Stack: TypeScript / Fastify single-process / Drizzle +
+Pinned at `v4.0.1` (`098a2f3`). Stack: TypeScript / Fastify single-process / Drizzle +
 **Postgres** (not SQLite — billing data) / Redis / Stripe SDK /
 `@grpc/grpc-js` / viem / tiktoken / pino. Layered architecture per the
 harness PDF (`types → config → providers → repo → service → runtime → main`).
@@ -882,7 +882,7 @@ ESLint rules:
 
 The routing/dispatch/inference engine has been carved out and published as
 [`@cloudspe/livepeer-openai-gateway-core`](https://github.com/Cloud-SPE/livepeer-openai-gateway-core)
-on npm (currently `3.0.0`). This repo is now the **proprietary shell**
+on npm (currently `4.0.1`). This repo is now the **proprietary shell**
 — billing, Stripe, customer portal, admin SPA — that consumes the engine
 via its npm dep.
 
@@ -910,17 +910,16 @@ The gateway README pins its docker-compose stack to:
 - `tztcloud/livepeer-payment-daemon:v1.4.0`
 - `tztcloud/livepeer-service-registry-daemon:v1.4.0`
 
-But `livepeer-modules`'s README publishes those images at `v1.0.0`. So the
+But `livepeer-modules`'s README publishes those images at `v3.0.2`. So the
 gateway's deployed daemon version is **ahead of** what `livepeer-modules`
 documents as current. Either there's a parallel release stream, or one of
 the READMEs is stale. Captured in tech-debt.
 
 ### `livepeer-openai-gateway-core` — OSS engine consumed by the gateway shell
 
-Pinned at `v3.0.0` (`bccb3ae`). Pure TypeScript engine published to npm as
+Pinned at `v4.0.1` (`8737750`). Pure TypeScript engine published to npm as
 [`@cloudspe/livepeer-openai-gateway-core`](https://www.npmjs.com/package/@cloudspe/livepeer-openai-gateway-core).
-This engine is already on the 3.x line, so normal semver expectations
-apply across future stable releases.
+The repo tag and published npm package are now aligned on `4.0.1`.
 
 The engine is the **adapter-driven request pipeline** that sits between an
 OpenAI-compatible client and the Livepeer worker pool. It owns the
@@ -957,11 +956,11 @@ without the registry daemon is unsupported. Both sidecars are mandatory:
 #### Engine ↔ shell version coupling
 
 `livepeer-openai-gateway` consumes this engine as an npm dep at a pinned
-version (today `3.0.0`). With both repos now in this meta-repo, the
+version (today `4.0.1`). With both repos now in this meta-repo, the
 version coupling is **doubly tracked**:
 
-1. `.gitmodules` pins the engine source at `v3.0.0` (`bccb3ae`).
-2. `livepeer-openai-gateway/package.json` pins the npm dep `@cloudspe/livepeer-openai-gateway-core@3.0.0`.
+1. `.gitmodules` pins the engine source at `v4.0.1` (`8737750`).
+2. `livepeer-openai-gateway/package.json` pins the npm dep `@cloudspe/livepeer-openai-gateway-core@4.0.1`.
 
 These must agree. Crosschecking is captured in tech-debt — once
 implemented, `scripts/sync-submodules.sh --verify` should parse the
@@ -970,7 +969,7 @@ tagged version.
 
 ### `livepeer-video-core` — OSS video engine (VOD + Live HLS)
 
-Pinned at `v3.0.1` (`a339104`). Pure TypeScript engine published to npm as
+Pinned at `v4.0.1` (`cd2a139`). Pure TypeScript engine published to npm as
 `@cloudspe/video-core`. Pre-1.0 versioning; breaking changes may still
 arrive in minor bumps until it reaches 1.0. MIT-licensed.
 
@@ -1054,7 +1053,7 @@ Per the README:
 
 ### `livepeer-video-gateway` — payer-side video shell
 
-Pinned at `v3.0.1` (`06e3b8d`). Stack: TypeScript / Fastify / Drizzle
+Pinned at `v4.0.1` (`111c9f5`). Stack: TypeScript / Fastify / Drizzle
 + Postgres / Redis / `@grpc/grpc-js` / pino. Proprietary shell — wires
 production adapters (Postgres ledger, S3-compatible storage, webhook
 delivery, etc.) into `@cloudspe/video-core` and exposes the customer
@@ -1084,8 +1083,8 @@ to find workers — same sidecars as `livepeer-openai-gateway`.
 
 ### `video-worker-node` — payee-side video worker
 
-Pinned at `v3.0.0-4` (`b586bbd`). Go (~270 KB at scaffold, more after
-the Phase 2 code lift). Workload-only Go daemon that performs
+Pinned at `v4.0.1` (`b32951b`). Go (~270 KB at scaffold, more after
+the Phase 2 code lift and later payment/runtime alignments). Workload-only Go daemon that performs
 FFmpeg-subprocess transcoding. Sister of `openai-worker-node` — same
 scaffolding pattern, different workload.
 
@@ -1197,7 +1196,7 @@ layer: it doesn't add new payment-protocol surface, it just buys minutes.
 
 ### `livepeer-vtuber-project` — autonomous AI VTuber SaaS ("Pipeline")
 
-Pinned at main HEAD `b1bcdac` (no tag yet). Mostly Python (~790 KB), with
+Pinned at `v4.0.1` (`5dc46d2`). Mostly Python (~790 KB), with
 a small TS surface (~26 KB) for the avatar-renderer (browser-based; per
 prior design notes, the Open-LLM-VTuber upstream renders in browser and
 the renderer here is net-new). Forks
@@ -1231,11 +1230,12 @@ Livepeer settlement is invisible behind the gateway boundary. That's the
 consumer using only the customer-facing API validates that the suite
 hangs together end-to-end.
 
-#### Forthcoming sibling repos (announced, not yet existing)
+#### Upstream README drift on sibling repo naming
 
-The README announces a planned pair `vtuber-livepeer-bridge` +
-`vtuber-worker-node` mirroring the OpenAI siblings. Two issues with the
-announced names:
+The sibling repos now exist and are pinned in this suite:
+`livepeer-vtuber-gateway` and `vtuber-worker-node`. The upstream
+`livepeer-vtuber-project` README still describes them as forthcoming and
+uses the retired `*-bridge` naming. Two issues with that stale wording:
 
 1. **`bridge` is retired.** Should be `vtuber-livepeer-gateway` per the
    current naming convention.
@@ -1244,7 +1244,7 @@ announced names:
    and "bridge" is retired. The vtuber README has propagated the old
    name into its planning docs.
 
-If/when the sibling pair lands, expect to revisit the naming. Tracked in
+Tracked in
 [`exec-plans/active/0001-upstream-naming-cleanup.md`](../exec-plans/active/0001-upstream-naming-cleanup.md).
 
 #### Why this matters for the suite shape
@@ -1271,14 +1271,15 @@ yet stated. Tracked in tech-debt.
 
 #### Active phase
 
-The README says "architecture realignment in flight" — phase 1
-(session-runner + avatar-renderer) is partially landed. The codebase is
-mid-evolution. Pinning to `main` is acceptable for now but expect
-churn.
+The repo is no longer an untagged realignment branch: the suite now pins
+its `v4.0.1` release. Current active work is follow-on hardening
+(Pattern B contract cleanup, standalone CI/release alignment, and the
+first full-stack smoke path), not the earlier "sibling repos forthcoming"
+phase still described by the upstream README.
 
 ### `livepeer-vtuber-gateway` — payer-side gateway for the vtuber workload
 
-Pinned at `v3.0.0` (`929938`). TypeScript / Fastify.
+Pinned at `v4.0.1` (`d5cf095`). TypeScript / Fastify.
 Structurally **forked from the `livepeer-openai-gateway` skeleton** — same
 layered architecture, same Stripe top-up flow, same Drizzle/Postgres
 ledger, same lint plugin shape. Per ADR-003 (in `livepeer-vtuber-project`),
@@ -1311,10 +1312,10 @@ Four HTTP endpoints (all under `Authorization: Bearer <customer-key>`):
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/v1/vtuber/sessions` | Open a session: pick a worker, fetch quote, open payer-daemon session, mint a session-scoped child bearer (`vtbs_*`), POST to worker's `/api/sessions/start`, return `session_child_bearer` |
+| `POST` | `/v1/vtuber/sessions` | Open a session: pick a worker, mint a sender-side payment envelope, mint a session-scoped child bearer (`vtbs_*`), POST to worker's `/api/sessions/start`, return `session_child_bearer` |
 | `GET` | `/v1/vtuber/sessions/{id}` | Status |
-| `POST` | `/v1/vtuber/sessions/{id}/end` | Close session, revoke child bearer, close payer + worker |
-| `POST` | `/v1/vtuber/sessions/{id}/topup` | Stripe Checkout for additional credits |
+| `POST` | `/v1/vtuber/sessions/{id}/end` | Close session, revoke child bearer, and ask the worker to end the live session |
+| `POST` | `/v1/vtuber/sessions/{id}/topup` | Mint another payment envelope and top up the live worker session |
 
 Plus two WebSocket endpoints under `/v1/vtuber/sessions/{id}`:
 
@@ -1366,7 +1367,7 @@ sequenceDiagram
     participant Resolver as service-registry-daemon<br/>resolver
     participant Sender as payment-daemon<br/>sender
     participant Receiver as payment-daemon<br/>receiver
-    participant VTBW as vtuber-worker-node<br/>(M1 — skeleton today)
+    participant VTBW as vtuber-worker-node
     participant Runner as session-runner<br/>(in livepeer-vtuber-project)
     participant OAIG as livepeer-openai-gateway
 
@@ -1460,38 +1461,32 @@ design at the project level, code at the gateway/worker level.
 #### Status
 
 M1-M9 milestones complete; full MVP assembled; **348 tests pass**. The
-worker side (`vtuber-worker-node`) now exists but is at M1 (skeleton
-only — see below) — the M9 smoke test still has no real target to hit
-until M2-M4 land on the worker.
+current `v4.0.1` tag line carries the post-MVP release normalization and
+follow-on CI/release alignment work on top of the earlier Pattern B
+sender-flow cut.
 
 ### `vtuber-worker-node` — payee-side worker for the vtuber workload
 
-Pinned at `v3.0.0` (`f7f6b36`). Go (~270 KB). Note the
+Pinned at `v3.0.11` (`633049f`). Go (~270 KB at scaffold, larger now with
+the streaming module and contract tests). Note the
 naming: workers don't get the `livepeer-` prefix (matches
 `openai-worker-node`); gateways do (`livepeer-openai-gateway`,
 `livepeer-vtuber-gateway`). Consistent with the OpenAI sibling pair.
 
-#### Status: M1 — skeleton only
+#### Status: functional Pattern B worker
 
-The current pin is intentionally non-functional. M1 is "copy the
-`openai-worker-node` skeleton and strip OpenAI-specific module code."
-A binary built at this commit **refuses to start against any non-empty
-`worker.yaml`** — that's the intended state for skeleton acceptance.
+The current pin is no longer the M1 scaffold. The bootstrap plan landed
+the `StreamingModule` interface, the `vtuber_session` module, capability
+advertisement, and contract tests; the later Pattern B alignment release
+updated the worker to the canonical open/topup/end routes and current
+receiver-side `payment-daemon` interfaces.
 
-The real work lands in M2-M4: `StreamingModule` interface, the
-`vtuber-session` module implementation, and contract tests.
-
-So today the vtuber pair is **lopsided**:
+So today the vtuber pair is a coherent tagged stack:
 
 | Side | Status |
 |---|---|
 | `livepeer-vtuber-gateway` | M9 — full MVP, 348 tests |
-| `vtuber-worker-node` | M1 — skeleton, refuses to start |
-
-The gateway has nothing real to dispatch to, and the M9 smoke test in
-the gateway can't actually exercise the path. This is normal for
-forked-skeleton pairs — one repo races ahead while the other catches
-up. Worth tracking, but not alarming.
+| `vtuber-worker-node` | Functional worker with receiver-side balance enforcement and Pattern B route alignment |
 
 #### Architecture parallels and divergences vs `openai-worker-node`
 
@@ -1502,7 +1497,7 @@ Same overall shape:
   (the worker and the local payment-daemon read the same YAML
   independently, drift detected at runtime).
 - `internal/runtime/http/` mux + payment middleware enforces ticket
-  validation before forwarding.
+  validation before forwarding into the streaming module.
 - gRPC client to local `payment-daemon` (receiver mode) over unix socket.
 - Custom golangci-lint analyzer (`lint/payment-middleware-check/`) — same
   harness pattern as the TS repos: enforce invariants mechanically with

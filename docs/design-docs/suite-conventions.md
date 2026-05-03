@@ -187,30 +187,28 @@ This is a strong invariant. No drift.
 
 | Submodule | Pinned at | Status |
 |---|---|---|
-| `livepeer-modules` | `v2.1.0-6` (`2e3ca33`) | ✅ |
-| `livepeer-up-installer` | `v0.1.0-3` (`bd9f3ff`) | ✅ |
-| `livepeer-secure-orch-console` | `v3.0.1` (`91a5b26`) | ✅ |
-| `livepeer-orch-coordinator` | `v3.0.1` (`1b5d4ed`) | ✅ |
-| `livepeer-gateway-console` | `v0.1.4-4` (`5cecca0`) | ✅ |
-| `openai-worker-node` | `v3.0.0-12` (`c969b13`) | ✅ |
-| `livepeer-openai-gateway` | `v3.0.1` (`b77def5`) | ✅ transitional pinned-core runtime |
-| `livepeer-openai-gateway-core` | `v3.0.0` (`bccb3ae`) | ✅ |
-| `livepeer-video-core` | `v3.0.1` (`a339104`) | ✅ repo tag; package still pre-1.0 |
-| `livepeer-video-gateway` | `v3.0.1` (`06e3b8d`) | ✅ |
-| `video-worker-node` | `v3.0.0-4` (`b586bbd`) | ✅ |
-| `livepeer-vtuber-gateway` | `v3.0.0` (`929938`) | ✅ |
-| `vtuber-worker-node` | `v3.0.0` (`f7f6b36`) | ✅ |
-| `livepeer-vtuber-project` | _(none — `b1bcdac`)_ | ❌ no tag |
+| `livepeer-modules` | `v4.0.2` (`a061b5a`) | ✅ |
+| `livepeer-up-installer` | `v4.0.1` (`6e16246`) | ✅ |
+| `livepeer-secure-orch-console` | `v4.0.1` (`5d2ccc5`) | ✅ |
+| `livepeer-orch-coordinator` | `v4.0.1` (`b767bfe`) | ✅ |
+| `livepeer-gateway-console` | `v4.0.1` (`08e9063`) | ✅ |
+| `openai-worker-node` | `v4.0.1` (`80b2347`) | ✅ |
+| `livepeer-openai-gateway` | `v4.0.1` (`098a2f3`) | ✅ |
+| `livepeer-openai-gateway-core` | `v4.0.1` (`8737750`) | ✅ |
+| `livepeer-video-core` | `v4.0.1` (`cd2a139`) | ✅ repo tag; package still pre-1.0 |
+| `livepeer-video-gateway` | `v4.0.1` (`111c9f5`) | ✅ |
+| `video-worker-node` | `v4.0.1` (`b32951b`) | ✅ |
+| `livepeer-vtuber-gateway` | `v4.0.1` (`d5cf095`) | ✅ |
+| `vtuber-worker-node` | `v3.0.11` (`633049f`) | ✅ latest worker tag on the current line |
+| `livepeer-vtuber-project` | `v4.0.1` (`5dc46d2`) | ✅ |
 
-**Drift:** `livepeer-vtuber-project` still lacks a version tag, and
-`livepeer-openai-gateway` remains intentionally transitional because its
-shell docs are aligned to the v3.0.1 contract while the pinned engine
-runtime is still `livepeer-openai-gateway-core@3.0.0`.
+**Drift:** the suite is now largely on the `v4.x` line. Two
+notable exceptions remain: `livepeer-modules` has already advanced to
+`v4.0.2`, and `vtuber-worker-node` currently tops out at `v3.0.11`.
 
 **Engine versioning:** `livepeer-video-core` is still pre-1.0 and may
-take breaking changes in minor bumps; `livepeer-openai-gateway-core` is
-already on the 3.x line. Shells should still pin exactly rather than
-auto-update.
+take breaking changes in minor bumps. Shells should still pin exactly
+rather than auto-update.
 
 ## Image registry + image versions
 
